@@ -1,0 +1,13 @@
+{
+  "name": "dev-harness",
+  "version": "0.1.0",
+  "description": "Plan -> implement -> independent review -> integrate loop for Claude Code: worktree-per-ticket agents, evidence-based reviews, and safety hooks.",
+  "author": {
+    "name": "Chao",
+    "url": "https://github.com/d85275"
+  },
+  "homepage": "https://github.com/d85275/claude-harness",
+  "repository": "https://github.com/d85275/claude-harness",
+  "license": "MIT",
+  "keywords": ["claude-code", "plugin", "workflow", "worktree", "code-review"]
+}

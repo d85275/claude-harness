@@ -1,0 +1,13 @@
+{
+  "protectedPaths": [
+    "keys/**",
+    "config/service-account.json"
+  ],
+  "protectedConfigs": [
+    "scripts/verify_thresholds.py"
+  ],
+  "askCommands": [
+    "./scripts/deploy.sh"
+  ],
+  "notify": true
+}

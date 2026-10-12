@@ -1,0 +1,18 @@
+{
+  "name": "dev-harness",
+  "owner": {
+    "name": "Chao",
+    "url": "https://github.com/d85275"
+  },
+  "metadata": {
+    "description": "Personal marketplace for the claude-harness plugin."
+  },
+  "plugins": [
+    {
+      "name": "dev-harness",
+      "source": "./",
+      "description": "Plan -> implement -> independent review -> integrate loop with safety hooks.",
+      "category": "productivity"
+    }
+  ]
+}
