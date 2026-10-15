@@ -4,12 +4,21 @@ A small Claude Code plugin for a disciplined **plan -> implement -> independent 
 
 ## Install
 
+Inside Claude Code:
+
 ```text
 /plugin marketplace add d85275/claude-harness
 /plugin install dev-harness@dev-harness
 ```
 
-For local development: `/plugin marketplace add ~/Projects/claude-harness`.
+Or from a terminal (the `/plugin` form is not a shell command):
+
+```sh
+claude plugin marketplace add d85275/claude-harness
+claude plugin install dev-harness@dev-harness
+```
+
+Restart running Claude Code sessions to pick up the agents, commands, and hooks. For local development, add the marketplace from a path instead: `claude plugin marketplace add ~/Projects/claude-harness`.
 
 Then add a `## Harness` section to the project's `CLAUDE.md` (template: [`templates/CLAUDE-harness-section.md`](templates/CLAUDE-harness-section.md)) and, optionally, `.claude/harness.json` for project-specific hook rules ([`templates/harness.json`](templates/harness.json)).
 
@@ -40,10 +49,13 @@ Model choice is deliberate: routine implementation and review run on Sonnet; Opu
 | Bash: outward-facing commands | Asks the owner before `git push`, `gh pr create/merge`, `gh repo create`, `firebase deploy` and other destructive Firebase/gcloud/terraform/kubectl commands (plus `askCommands`). |
 | Bash: machine-wide device resets | Blocks `simctl shutdown all`, `simctl delete/erase all`, `adb emu kill`, killing all simulators, while another `xcodebuild`/`gradlew` run is active, so parallel agents do not kill each other's devices. |
 | Read: credentials | Blocks reading protected credential files. |
-| Edit/Write: protected configs | Asks before editing lint/format configs, `.claude` settings, and `protectedConfigs` (e.g. validator thresholds), so agents fix code instead of weakening checks. |
+| Edit/Write: protected configs | Asks before editing lint/format configs, test plans/runner configs, `.claude` settings, and `protectedConfigs` (e.g. validator thresholds), so agents fix code instead of weakening checks. |
+| Edit/Write: weakened checks | Asks when an edit *adds* a test skip, accessibility-audit filter, or lint/type suppression (`XCTSkip`, `@skip`, `it.skip`, `@Ignore`, `@Suppress`, `# noqa`, `@ts-ignore`, `eslint-disable`, `--no-verify`, ...; extend with `weakeningMarkers`, turn off with `"checkWeakening": false`). Moving or removing an existing one is allowed. |
 | Notification | macOS desktop notification when Claude needs you (`"notify": false` to turn off). |
 
 Hooks are best-effort guardrails, not a sandbox; keep permission deny rules for anything that must never happen.
+
+Tests: `python3 -m unittest discover -s tests`.
 
 ## Layout
 
@@ -53,6 +65,7 @@ agents/           implementer, reviewer, high-risk-reviewer, silent-failure-hunt
 commands/         plan, start-ticket, review, close-ticket, sync
 hooks/            hooks.json, scripts/guard.py
 templates/        CLAUDE.md Harness section, harness.json
+tests/            guard.py tests
 ```
 
 ## Credits

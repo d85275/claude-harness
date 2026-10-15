@@ -9,5 +9,7 @@
   "askCommands": [
     "./scripts/deploy.sh"
   ],
+  "checkWeakening": true,
+  "weakeningMarkers": [],
   "notify": true
 }

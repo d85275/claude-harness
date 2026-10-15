@@ -11,6 +11,8 @@ Project overrides: <project>/.claude/harness.json
     "protectedPaths":   ["android/keys/**", "backend/service-account.json"],
     "protectedConfigs": ["ios/scripts/verify_visual_parity_baseline.py"],
     "askCommands":      ["firebase firestore:delete", "./deploy.sh"],
+    "checkWeakening":   true,
+    "weakeningMarkers": ["\\bExclusion\\("],
     "notify": true
   }
 """
@@ -30,6 +32,16 @@ DEFAULT_PROTECTED_CONFIGS = [
     "**/.swiftlint.yml", "**/.swiftformat", "**/.eslintrc*", "**/eslint.config.*",
     "**/.prettierrc*", "**/detekt*.yml", "**/lint.xml", "**/.flake8", "**/ruff.toml",
     "**/.claude/settings.json", "**/.claude/settings.local.json", "**/.claude/harness.json",
+    "**/*.xctestplan", "**/pytest.ini", "**/.coveragerc", "**/jest.config.*", "**/vitest.config.*",
+    "**/codecov.yml",
+]
+# An edit that adds one of these switches a check off instead of fixing the code.
+WEAKENING_MARKERS = [
+    r"\bXCTSkip\b", r"\bperformAccessibilityAudit\b[^\n]*\{",
+    r"@(unittest\.)?skip", r"\bpytest\.mark\.(skip|xfail)\b", r"\b(it|test|describe)\.skip\(",
+    r"\bx(it|describe)\(", r"@Ignore\b", r"@Disabled\b", r"@Suppress(Lint|Warnings)?\b",
+    r"\bswiftlint:disable\b", r"\beslint-disable", r"@ts-(ignore|nocheck|expect-error)\b",
+    r"#\s*noqa\b", r"#\s*type:\s*ignore\b", r"\bnolint\b", r"--no-verify\b",
 ]
 DEFAULT_ASK_COMMANDS = [
     r"\bgit\b(?:\s+-\S+(?:\s+\S+)?)*\s+push\b",
@@ -146,12 +158,42 @@ def guard_read(data, cfg):
         block(f"Reading protected credential file blocked: {path}")
 
 
+def edit_texts(tool_input, path):
+    """(before, after) text of the change, as far as the hook input shows it."""
+    if "edits" in tool_input:  # MultiEdit
+        edits = tool_input.get("edits") or []
+        return ("\n".join(e.get("old_string", "") for e in edits),
+                "\n".join(e.get("new_string", "") for e in edits))
+    if "content" in tool_input:  # Write replaces the whole file
+        try:
+            with open(path) as f:
+                before = f.read()
+        except Exception:
+            before = ""
+        return before, tool_input.get("content", "")
+    return tool_input.get("old_string", ""), tool_input.get("new_string", "")
+
+
+def added_weakening(before, after, extra=()):
+    return [m for m in WEAKENING_MARKERS + list(extra)
+            if len(re.findall(m, after)) > len(re.findall(m, before))]
+
+
 def guard_edit(data, cfg):
-    path = (data.get("tool_input") or {}).get("file_path", "")
+    tool_input = data.get("tool_input") or {}
+    path = tool_input.get("file_path", "")
     configs = DEFAULT_PROTECTED_CONFIGS + cfg.get("protectedConfigs", [])
     if matches(path, configs, data.get("cwd")):
         ask(f"{path} is a protected config (lint/test thresholds, validators, or guardrails). "
             "Fix the code instead of weakening the check, unless the owner approves this edit.")
+    if cfg.get("checkWeakening", True) is False:
+        return
+    absolute = os.path.join(data.get("cwd") or os.getcwd(), os.path.expanduser(path))
+    added = added_weakening(*edit_texts(tool_input, absolute), cfg.get("weakeningMarkers", []))
+    if added:
+        ask(f"This edit to {path} adds a test skip, audit exclusion, or lint suppression "
+            f"({', '.join(added[:3])}). Fix the code instead, or get the owner's OK and give a "
+            "reason next to it.")
 
 
 def notify(data, cfg):

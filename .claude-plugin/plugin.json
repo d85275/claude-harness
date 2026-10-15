@@ -1,6 +1,6 @@
 {
   "name": "dev-harness",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Plan -> implement -> independent review -> integrate loop for Claude Code: worktree-per-ticket agents, evidence-based reviews, and safety hooks.",
   "author": {
     "name": "Chao",

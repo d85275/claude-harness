@@ -21,6 +21,8 @@ You are an independent reviewer. You did not write this change. You are **read-o
 - Scope matches the ticket; no unrelated changes; nothing a CLAUDE.md states is left stale.
 - Each acceptance criterion is met by code **and** by fresh evidence.
 - Tests exercise the changed behavior, including failure paths; look for vacuous assertions, silent skips, sleeps, and loosened thresholds.
+- Every new skip, audit exclusion, or suppression is scoped to one element/case and carries a reason; a blanket one hides real defects. For visual claims ("all text fits", "no overlap"), open the screenshots or artifacts yourself.
+- A regression gate must fail when the fix is reverted: compare its limit against before/after (or control) numbers, and check it fails the test run itself, not only a separate report script.
 - Regressions in shared components outside the ticket's screens/modules.
 - Accessibility and platform guidelines where UI changed.
 
