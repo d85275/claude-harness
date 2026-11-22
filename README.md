@@ -103,7 +103,7 @@ agents/           implementer, implementer-advanced, reviewer, high-risk-reviewe
 commands/         plan, start-ticket, review, close-ticket, sync
 hooks/            hooks.json, scripts/guard.py, scripts/harness_config.py
 templates/        CLAUDE.md Harness section, harness.json
-tests/            guard and config loader tests
+tests/            guard, config loader, agent tier and dev-harness-config tests
 ```
 
 `bin/dev-harness-config get <key>` prints one value of the merged config for the current directory (scalars plainly, lists and objects as JSON). Config warnings go to stderr with exit 1 (the value is still printed); an unknown key or bad usage exits 2. Commands use it because `CLAUDE_PLUGIN_ROOT` is not set in the Bash tool's environment.

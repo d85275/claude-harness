@@ -32,7 +32,7 @@ Goal: release **1.0** of the `dev-harness` plugin with a ticket system and a Jir
 
 ## Next
 
-CH-01 is done (c2efe7d). Next: CH-02 to CH-07; all depend only on CH-01 and may run in parallel (CH-03 is high-risk).
+CH-01 is done (c2efe7d). CH-02 is done (ef867a1). Tickets run one at a time (owner, 2026-11-22). Next: CH-03 (high-risk), then CH-04 to CH-07.
 
 ## Owner decisions
 
