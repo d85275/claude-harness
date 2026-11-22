@@ -6,9 +6,10 @@ States: `Planned`, `In progress`, `In review`, `Fixing`, `Owner check`, `Done`, 
 
 | ID | Title | Review | State | Commit | Note |
 |---|---|---|---|---|---|
-| [CH-01](CH-01.md) | One `harness.json` schema and shared config loader | standard + SF | Planned | | Do first; others depend on it |
+| [CH-01](CH-01.md) | One `harness.json` schema and shared config loader | standard + SF | Fixing | | Review round 2: fixing lookup and crash paths |
 | [CH-02](CH-02.md) | Model tiers and implementer routing | standard | Planned | | |
 | [CH-03](CH-03.md) | Push policy | high-risk | Planned | | Deploys always ask (owner, 2026-11-22) |
 | [CH-04](CH-04.md) | Stash and `core.hooksPath` guards | standard | Planned | | |
 | [CH-05](CH-05.md) | Warn on generated / ignored files in commits | standard + SF | Planned | | |
 | [CH-06](CH-06.md) | Device rules as opt-in presets | standard | Planned | | Breaking change; CHANGELOG |
+| [CH-07](CH-07.md) | Close remaining fail-open paths in the guard | standard + SF | Planned | | From CH-01 review |
