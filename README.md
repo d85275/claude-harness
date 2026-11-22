@@ -57,15 +57,42 @@ Hooks are best-effort guardrails, not a sandbox; keep permission deny rules for 
 
 Tests: `python3 -m unittest discover -s tests`.
 
+## Configuration (`.claude/harness.json`)
+
+Every key is optional; a missing file means all defaults. Config files are merged, never overridden. The sources are `$CLAUDE_PROJECT_DIR/.claude/harness.json` (when present) and the nearest `.claude/harness.json` found walking up from the working directory, stopping at the repository root (first folder containing `.git`, a folder or a worktree file; without one, at `$CLAUDE_PROJECT_DIR` if inside it, else only the working directory). Without `CLAUDE_PROJECT_DIR`, every file up to the repository root counts. A file above the repository root is never loaded; the hook only warns that it exists. Each file loads on its own, so a broken one is reported (an unreadable file counts as present, not missing) while the others still apply. The result is never weaker than any single file: lists (`protectedPaths`, `protectedConfigs`, `askCommands`, `weakeningMarkers`, `presets`) are unioned, `pushPolicy` takes the strictest (`deny` > `ask` > `allow`), `checkWeakening` is on if any file says so, and the remaining keys take the root file's value, falling back to a nested file. So a stricter worktree config applies immediately, and a weaker one changes nothing. Identical copies produce no notice; differing ones produce one notice naming both files. Project globs match relative to each file's project folder as well as to the working directory.
+
+A malformed file, an unknown key, a bad regex or a value of the wrong type is never ignored silently. The hook still enforces the built-in rules, falls back to the default for the bad part (for the lists `protectedPaths`, `protectedConfigs`, `askCommands` and `weakeningMarkers` it keeps the valid entries and a bare string counts as a one-item list), and reports the problem three ways: on stderr, as `systemMessage` for the user, and as `additionalContext` for Claude (on a permission prompt it is also appended to the reason; on a block it is appended to the message). The warning says which project protections are not active. Combining `systemMessage` with `hookSpecificOutput` in one object is not shown in the Claude Code hooks docs; verify with `claude --debug`. Example with every key: [`templates/harness.json`](templates/harness.json). The shared loader is `hooks/scripts/harness_config.py`.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `version` | `1` | Schema version; only `1` exists. |
+| `protectedPaths` | `[]` | Extra globs the guard treats as credentials. |
+| `protectedConfigs` | `[]` | Extra globs whose edits need the owner's OK. |
+| `askCommands` | `[]` | Extra command substrings that need the owner's OK. |
+| `checkWeakening` | `true` | Ask when an edit adds a test skip or lint suppression. |
+| `weakeningMarkers` | `[]` | Extra regexes counted as weakening. |
+| `notify` | `true` | macOS notification when Claude needs you. |
+| `pushPolicy` | `"ask"` | `"ask"`, `"deny"` or `"allow"` for `git push` (enforced from CH-03). |
+| `presets` | `[]` | Opt-in rule sets (filled in from CH-06). |
+| `highRiskReviewerModel` | `"opus"` | `"opus"` or `"fable"` (used from CH-02). |
+| `tickets.dirs` | `["docs/tickets"]` | Folders holding ticket files. |
+| `tickets.featureGlobs` | `[]` | Globs mapping files to features. |
+| `tickets.idPrefixes` | `{}` | Ticket ID prefix -> `{"platform": ..., "kind": ...}`. |
+| `tickets.twinPlatforms` | `null` | List of platforms that mirror each other, or `null`. |
+| `tickets.archive` | `false` | Move closed tickets to an archive. |
+| `tickets.trackerPath` | `"docs/tickets/tracker.md"` | Tracker file. |
+| `tickets.integrationBranch` | `"main"` | Branch tickets are integrated onto. |
+| `tickets.boardPath` | `"docs/tickets/board.html"` | Generated board file. |
+
 ## Layout
 
 ```text
 .claude-plugin/   plugin.json, marketplace.json
 agents/           implementer, reviewer, high-risk-reviewer, silent-failure-hunter
 commands/         plan, start-ticket, review, close-ticket, sync
-hooks/            hooks.json, scripts/guard.py
+hooks/            hooks.json, scripts/guard.py, scripts/harness_config.py
 templates/        CLAUDE.md Harness section, harness.json
-tests/            guard.py tests
+tests/            guard and config loader tests
 ```
 
 ## Credits

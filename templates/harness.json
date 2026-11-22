@@ -1,15 +1,22 @@
 {
-  "protectedPaths": [
-    "keys/**",
-    "config/service-account.json"
-  ],
-  "protectedConfigs": [
-    "scripts/verify_thresholds.py"
-  ],
-  "askCommands": [
-    "./scripts/deploy.sh"
-  ],
+  "version": 1,
+  "protectedPaths": ["keys/**", "config/service-account.json"],
+  "protectedConfigs": ["scripts/verify_thresholds.py"],
+  "askCommands": ["./scripts/deploy.sh"],
   "checkWeakening": true,
   "weakeningMarkers": [],
-  "notify": true
+  "notify": true,
+  "pushPolicy": "ask",
+  "presets": [],
+  "highRiskReviewerModel": "opus",
+  "tickets": {
+    "dirs": ["docs/tickets"],
+    "featureGlobs": ["src/features/*"],
+    "idPrefixes": {"WEB": {"platform": "web", "kind": "feature"}},
+    "twinPlatforms": null,
+    "archive": false,
+    "trackerPath": "docs/tickets/tracker.md",
+    "integrationBranch": "main",
+    "boardPath": "docs/tickets/board.html"
+  }
 }

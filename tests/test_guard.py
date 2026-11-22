@@ -13,7 +13,8 @@ def run(mode, tool_input, cwd, env=None):
     payload = json.dumps({"tool_input": tool_input, "cwd": cwd})
     proc = subprocess.run([sys.executable, "-I", GUARD, mode], input=payload,
                           capture_output=True, text=True, timeout=20,
-                          env={**os.environ, **(env or {})})
+                          env={**{k: v for k, v in os.environ.items() if k != "CLAUDE_PROJECT_DIR"},
+                               **(env or {})})
     if proc.returncode == 2:
         return "block"
     if proc.returncode == 0 and '"ask"' in proc.stdout:

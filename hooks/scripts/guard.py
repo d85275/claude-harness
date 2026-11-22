@@ -15,6 +15,8 @@ Project overrides: <project>/.claude/harness.json
     "weakeningMarkers": ["\\bExclusion\\("],
     "notify": true
   }
+All keys and defaults: hooks/scripts/harness_config.py. A malformed file or an unknown key
+is reported on stderr; built-in rules still apply.
 """
 import fnmatch
 import json
@@ -23,6 +25,9 @@ import re
 import shlex
 import subprocess
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # python3 -I omits it
+import harness_config
 
 DEFAULT_PROTECTED_PATHS = [
     "**/*.p8", "**/*.p12", "**/*.pem", "**/*.key", "**/*.jks", "**/*.keystore",
@@ -73,22 +78,34 @@ def load_input():
         return {}
 
 
+# Set by load_config: text shown to the user and the model (exit 0 stderr reaches neither),
+# and the project root that holds harness.json (for root-relative globs).
+CONFIG_WARNING = ""
+PROJECT_ROOTS = []
+
+
 def load_config(cwd):
-    path = os.path.join(cwd or os.getcwd(), ".claude", "harness.json")
-    try:
-        with open(path) as f:
-            return json.load(f)
-    except Exception:
-        return {}
+    """Config with defaults filled in; problems are kept in CONFIG_WARNING and put on stderr."""
+    global CONFIG_WARNING, PROJECT_ROOTS
+    cfg, errors, PROJECT_ROOTS = harness_config.load_all(cwd)
+    if errors:
+        CONFIG_WARNING = "[dev-harness] harness.json problems: " + "; ".join(errors)
+        try:
+            sys.stderr.write(harness_config.format_errors(errors))
+        except Exception:  # stderr may be closed or None; the warning still goes to stdout
+            pass
+    return cfg
 
 
-def matches(path, globs, cwd):
+def matches(path, globs, cwd, roots=()):
     if not path or os.path.basename(path).endswith((".example", ".sample", ".template")):
         return False
     path = os.path.expanduser(path)
     absolute = os.path.abspath(os.path.join(cwd or os.getcwd(), path))
     rel = os.path.relpath(absolute, cwd) if cwd else absolute
     candidates = {path, absolute, rel, os.path.basename(path)}
+    for root in roots or ():
+        candidates.add(os.path.relpath(absolute, root))
     for g in globs:
         variants = {g, g.replace("**/", "")}
         for c in candidates:
@@ -98,17 +115,32 @@ def matches(path, globs, cwd):
     return False
 
 
+def emit(decision=None, reason=None, pre_tool_use=True):
+    """Print exactly one JSON object on stdout (nothing when there is nothing to say)."""
+    out = {}
+    hook = {}
+    if decision:
+        hook.update(hookEventName="PreToolUse", permissionDecision=decision,
+                    permissionDecisionReason=reason)
+    if CONFIG_WARNING:
+        out["systemMessage"] = CONFIG_WARNING  # shown to the user
+        if pre_tool_use:
+            hook.update(hookEventName="PreToolUse", additionalContext=CONFIG_WARNING)  # model
+    if hook:
+        out["hookSpecificOutput"] = hook
+    if out:
+        print(json.dumps(out))
+
+
 def block(msg):
+    # The config warning is already on stderr (load_config), so it is not repeated here.
     print(f"[dev-harness] {msg}", file=sys.stderr)
     sys.exit(2)
 
 
 def ask(reason):
-    print(json.dumps({"hookSpecificOutput": {
-        "hookEventName": "PreToolUse",
-        "permissionDecision": "ask",
-        "permissionDecisionReason": f"[dev-harness] {reason}",
-    }}))
+    suffix = f" {CONFIG_WARNING}" if CONFIG_WARNING else ""
+    emit("ask", f"[dev-harness] {reason}{suffix}")
     sys.exit(0)
 
 
@@ -143,7 +175,7 @@ def guard_bash(data, cfg):
         for t in tokens:
             if t.startswith("-"):
                 continue
-            if matches(t, protected, cwd):
+            if matches(t, protected, cwd, PROJECT_ROOTS):
                 block(f"Command would read or copy a protected credential path ({t}). "
                       "Report paths only; never print or copy credential contents.")
     for pattern in DEFAULT_ASK_COMMANDS + [re.escape(c) for c in cfg.get("askCommands", [])]:
@@ -154,7 +186,7 @@ def guard_bash(data, cfg):
 def guard_read(data, cfg):
     path = (data.get("tool_input") or {}).get("file_path", "")
     protected = DEFAULT_PROTECTED_PATHS + cfg.get("protectedPaths", [])
-    if matches(path, protected, data.get("cwd")):
+    if matches(path, protected, data.get("cwd"), PROJECT_ROOTS):
         block(f"Reading protected credential file blocked: {path}")
 
 
@@ -175,15 +207,21 @@ def edit_texts(tool_input, path):
 
 
 def added_weakening(before, after, extra=()):
-    return [m for m in WEAKENING_MARKERS + list(extra)
-            if len(re.findall(m, after)) > len(re.findall(m, before))]
+    added = []
+    for m in WEAKENING_MARKERS + list(extra):
+        try:
+            if len(re.findall(m, after)) > len(re.findall(m, before)):
+                added.append(m)
+        except re.error:  # a bad project pattern must not disable the other checks
+            continue
+    return added
 
 
 def guard_edit(data, cfg):
     tool_input = data.get("tool_input") or {}
     path = tool_input.get("file_path", "")
     configs = DEFAULT_PROTECTED_CONFIGS + cfg.get("protectedConfigs", [])
-    if matches(path, configs, data.get("cwd")):
+    if matches(path, configs, data.get("cwd"), PROJECT_ROOTS):
         ask(f"{path} is a protected config (lint/test thresholds, validators, or guardrails). "
             "Fix the code instead of weakening the check, unless the owner approves this edit.")
     if cfg.get("checkWeakening", True) is False:
@@ -209,12 +247,30 @@ def notify(data, cfg):
 
 
 def main():
+    try:
+        run()
+    except Exception as e:  # SystemExit (block/ask/allow) passes through
+        message = f"[dev-harness] hook crashed: {type(e).__name__}: {e}; this call was not checked"
+        if CONFIG_WARNING:
+            message += " " + CONFIG_WARNING
+        try:
+            print(json.dumps({"systemMessage": message}))
+        except Exception:
+            try:
+                sys.stderr.write(message + "\n")
+            except Exception:
+                pass
+    sys.exit(0)
+
+
+def run():
     mode = sys.argv[1] if len(sys.argv) > 1 else ""
     data = load_input()
     cfg = load_config(data.get("cwd"))
     {"bash": guard_bash, "read": guard_read, "edit": guard_edit, "notify": notify}.get(
         mode, lambda d, c: None)(data, cfg)
-    sys.exit(0)
+    if mode in ("bash", "read", "edit", "notify"):  # allowed: only a config warning to show
+        emit(pre_tool_use=mode != "notify")
 
 
 if __name__ == "__main__":
