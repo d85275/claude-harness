@@ -53,7 +53,7 @@ Model choice is deliberate, by alias only (never a pinned version), and there is
 - **high-risk-reviewer** - read-only senior review for identity, payments, deletion, security, shared contracts, release.
 - **silent-failure-hunter** - read-only second lens for swallowed errors, catch-all fallbacks, and "unknown" collapsed into a definite answer.
 
-## Hooks (`hooks/scripts/guard.py`)
+## Hooks (`hooks/scripts/`)
 
 | Hook | Behavior |
 |---|---|
