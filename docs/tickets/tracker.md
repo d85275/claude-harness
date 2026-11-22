@@ -13,4 +13,4 @@ States: `Planned`, `In progress`, `In review`, `Fixing`, `Owner check`, `Done`, 
 | [CH-05](CH-05.md) | Warn on generated / ignored files in commits | standard + SF | Planned | | |
 | [CH-06](CH-06.md) | Device rules as presets, auto-on for mobile projects | standard | Planned | | Auto-on with Xcode project or `gradlew` (owner) |
 | [CH-07](CH-07.md) | Close remaining fail-open paths in the guard | standard + SF | Planned | | From CH-01 review |
-| [CH-08](CH-08.md) | Split `guard.py` into scanner, Bash rules and hook entry | high-risk | Planned | | After CH-03, before CH-04 (owner) |
+| [CH-08](CH-08.md) | Split `guard.py` into scanner, Bash rules and hook entry | high-risk | In review | | After CH-03, before CH-04 (owner) |
