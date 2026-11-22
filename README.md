@@ -121,9 +121,16 @@ Detection matches text, so it errs towards asking: under `"deny"` a command that
 bin/              dev-harness-config (on the Bash PATH while the plugin is enabled)
 agents/           implementer, implementer-advanced, reviewer, high-risk-reviewer, silent-failure-hunter
 commands/         plan, start-ticket, review, close-ticket, sync
-hooks/            hooks.json, scripts/guard.py, scripts/harness_config.py
+hooks/            hooks.json and scripts/:
+                    guard.py           hook entry: input, ask/block, crash handler, Read/Edit/notify guards
+                    bash_rules.py      Bash rules: credential reads, push policy, always-ask
+                                       commands, device resets; runs shell_check
+                    shell_check.py     one pass over a command: push detection, config writes
+                    shell_scan.py      shell scanner (words, operators, heredocs, quoting) and work budget
+                    harness_config.py  harness.json schema, loading and merging
 templates/        CLAUDE.md Harness section, harness.json
-tests/            guard, config loader, agent tier and dev-harness-config tests;
+tests/            guard (end to end), push policy, config writes, shell scanner, config loader,
+                  agent tier and dev-harness-config tests;
                   tests/data/guard_corpus.txt: commands with the expected decision per policy
 ```
 
