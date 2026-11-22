@@ -6,6 +6,8 @@
 #   === all=ask                                    the same decision for every setup
 #   ... os=darwin                                  only checked on macOS (case-insensitive paths)
 #   ... # gap: <what>                              known gap, a follow-up; update the row when fixed
+# Stash rows: the none/ask/deny dirs are no repo, so git cannot count worktrees (ask); the allow dir
+# is a one-worktree repo (allow). Two worktrees: tests/test_git_state.py.
 # Setups (tests/test_guard_corpus.py): none = no harness.json; ask, deny = that pushPolicy plus
 # protectedConfigs ["scripts/verify_thresholds.py"]; allow = the same, committed in a local repo.
 === none=ask ask=ask deny=block allow=allow
@@ -261,7 +263,7 @@ tar xf /tmp/t.tar
 unzip -o /tmp/t.zip .claude/harness.json
 === all=ask
 git checkout stash@{0} -- .claude/harness.json
-=== all=allow # gap: stash restore
+=== none=ask ask=ask deny=ask allow=allow
 git stash pop
 === all=ask
 ln -s /tmp/x .claude/harness.json
@@ -404,7 +406,7 @@ git worktree add .worktrees/ch-04 -b feature/ch-04 main
 git worktree remove .worktrees/ch-03
 === all=allow
 git branch -d feature/ch-03
-=== all=allow
+=== none=ask ask=ask deny=ask allow=allow
 git stash push -m wip
 === all=allow
 git log --oneline -5 -- .claude/harness.json
@@ -538,3 +540,99 @@ x="$(echo "a
 # b")"; git push origin HEAD
 === all=allow # gap: comment misread inside ${...} (config write)
 echo "${x:-"a # b"}"; rm .claude/settings.json
+
+=== none=ask ask=ask deny=ask allow=allow
+git stash
+=== none=ask ask=ask deny=ask allow=allow
+git stash push
+=== none=ask ask=ask deny=ask allow=allow
+git stash push -u
+=== none=ask ask=ask deny=ask allow=allow
+git stash push -m "msg"
+=== none=ask ask=ask deny=ask allow=allow
+git stash save "msg"
+=== none=ask ask=ask deny=ask allow=allow
+git stash pop
+=== none=ask ask=ask deny=ask allow=allow
+git stash apply
+=== none=ask ask=ask deny=ask allow=allow
+git stash drop
+=== none=ask ask=ask deny=ask allow=allow
+git stash clear
+=== none=ask ask=ask deny=ask allow=allow
+git -C . stash pop
+=== none=ask ask=ask deny=ask allow=allow
+git add -A && git stash
+=== none=ask ask=ask deny=ask allow=allow
+make; git stash pop
+=== none=ask ask=ask deny=ask allow=allow
+sh -c 'git stash'
+=== none=ask ask=ask deny=ask allow=allow
+bash -c "cd sub && git stash pop"
+=== none=ask ask=ask deny=ask allow=allow
+GIT stash
+=== none=allow ask=allow deny=allow allow=allow
+git stash list
+=== none=allow ask=allow deny=allow allow=allow
+git stash show
+=== none=allow ask=allow deny=allow allow=allow
+git stash show -p
+=== none=allow ask=allow deny=allow allow=allow
+git stash list && git status
+=== none=ask ask=ask deny=ask allow=ask
+git config core.hooksPath x
+=== none=ask ask=ask deny=ask allow=ask
+git config --local core.hooksPath x
+=== none=ask ask=ask deny=ask allow=ask
+git config --global core.hooksPath x
+=== none=ask ask=ask deny=ask allow=ask
+git config --worktree core.hooksPath x
+=== none=ask ask=ask deny=ask allow=ask
+git config --system core.hooksPath x
+=== none=ask ask=ask deny=ask allow=ask
+git config --unset core.hooksPath
+=== none=ask ask=ask deny=ask allow=ask
+git config --global --unset core.hooksPath
+=== none=ask ask=ask deny=ask allow=ask
+git config --unset-all core.hooksPath
+=== none=ask ask=ask deny=ask allow=ask
+git config core.hookspath x
+=== none=ask ask=ask deny=ask allow=ask
+git config CORE.HOOKSPATH x
+=== none=ask ask=ask deny=ask allow=ask
+git config --unset core.HooksPath
+=== none=ask ask=ask deny=ask allow=ask
+git -c core.hooksPath=x commit -m t
+=== none=ask ask=ask deny=ask allow=ask
+git -c core.hookspath=/dev/null status
+=== none=ask ask=ask deny=ask allow=ask
+git -c user.name=a -c core.hooksPath=x log
+=== none=ask ask=ask deny=ask allow=ask
+sh -c 'git config core.hooksPath x'
+=== none=ask ask=ask deny=ask allow=ask
+git add -A && git config core.hooksPath .githooks
+=== none=ask ask=ask deny=ask allow=ask
+git config set core.hooksPath x
+=== none=ask ask=ask deny=ask allow=ask
+git config unset core.hooksPath
+=== none=allow ask=allow deny=allow allow=allow
+git config --get core.hooksPath
+=== none=allow ask=allow deny=allow allow=allow
+git config core.hooksPath
+=== none=allow ask=allow deny=allow allow=allow
+git config --list
+=== none=allow ask=allow deny=allow allow=allow
+git config --global --get core.hooksPath
+=== none=allow ask=allow deny=allow allow=allow
+git config user.name x
+=== none=allow ask=allow deny=allow allow=allow
+git -c user.name=a commit -m t
+=== none=allow ask=allow deny=allow allow=allow
+git config --get-all core.hooksPath
+=== none=allow ask=allow deny=allow allow=allow
+git config get core.hooksPath
+=== none=allow ask=allow deny=allow allow=allow
+cat <<'EOF' > notes.txt
+git config core.hooksPath x
+git stash
+EOF

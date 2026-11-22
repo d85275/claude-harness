@@ -108,6 +108,8 @@ class ShellCheck(shell_scan.Budget):
         self.publish = False
         self.config_hit = None
         self.seen = set()
+        self.texts = []     # (full text, data heredoc spans) of the command and of each nested body
+        self.segments = []  # (words, folders added by `git -C`) of each simple command
         super().__init__()  # the budget starts now
 
     def run(self, cmd):
@@ -179,6 +181,7 @@ class ShellCheck(shell_scan.Budget):
         bases = list(bases)
         for seg, targets, here in segments:
             self.segment(seg, targets, here, bases, all_words, depth)
+        self.texts.append((full, spans))
         return full, spans
 
     def segment(self, seg, targets, here, bases, all_words, depth):
@@ -197,6 +200,7 @@ class ShellCheck(shell_scan.Budget):
                         j += 2
                     else:
                         j += 2 if seg[j] in GIT_OPTIONS_WITH_VALUE else 1
+        self.segments.append((seg, seg_bases[len(bases):]))
         if names and names[0] in ("cd", "pushd"):
             k = 1
             while k < len(seg) and seg[k].startswith("-") and seg[k] != "-":

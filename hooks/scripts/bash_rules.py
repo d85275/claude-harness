@@ -18,7 +18,8 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:  # python3 -I omits it
     sys.path.insert(0, _HERE)
 import harness_config  # noqa: E402
-from shell_check import DEFAULT_PROTECTED_CONFIGS, ShellCheck  # noqa: E402, F401
+from shell_check import (DEFAULT_PROTECTED_CONFIGS, GIT_OPTIONS_WITH_VALUE, _OPTS,  # noqa: E402, F401
+                         ShellCheck)
 from shell_scan import CheckTooLarge  # noqa: E402
 
 DEFAULT_PROTECTED_PATHS = [
@@ -106,6 +107,7 @@ def check(cmd, cfg, cwd, roots):
     try:
         shell = ShellCheck(cfg, cwd, roots)
         shell.run(cmd)
+        git_state = git_state_hits(shell)
     except CheckTooLarge:
         return ("ask", "Command too large to check; approve manually. The push policy and "
                 "protected-config checks did not finish within their work budget. "
@@ -132,6 +134,10 @@ def check(cmd, cfg, cwd, roots):
                 f"protected config ({shell.config_hit}: lint/test thresholds, validators, or "
                 "guardrails such as harness.json). Fix the code instead of weakening the check, "
                 f"unless the owner approves. Command: {cmd[:200]}")
+    if git_state:
+        ask = git_state_ask(git_state, cwd, cmd)
+        if ask:
+            return ask
     # Reached under "allow" too: a deploy or askCommand chained onto a push still asks.
     for pattern in ALWAYS_ASK_COMMANDS + [re.escape(c) for c in cfg.get("askCommands", [])]:
         if re.search(pattern, cmd):
@@ -169,3 +175,137 @@ def push_policy_files_changed(cwd):
     if listed.returncode != 0:
         return True
     return any(line[:1].islower() or line.startswith("S ") for line in listed.stdout.splitlines())
+
+
+# --- git state: `git stash` with several worktrees, and `core.hooksPath` ---------------------
+# Regexes read the full text (the structural rule); a hit inside a data heredoc body is dropped.
+STASH_REGEX = re.compile(r"\bgit\b" + _OPTS + r"\s+stash\b(?!\s+(?:list|show)\b)", re.IGNORECASE)
+GIT_CONFIG_REGEX = re.compile(r"\bgit\b" + _OPTS + r"\s+config\b([^\n;&|]{0,500})", re.IGNORECASE)
+GIT_HOOKS_OPTION_REGEX = re.compile(
+    r"\bgit\b[^\n;&|]{0,300}?\s(?:-c\s*|--config-env[=\s])['\"]?core\.hookspath\b", re.IGNORECASE)
+CONFIG_VALUE_OPTIONS = {"-f", "--file", "--blob", "--type", "-t", "--default"}
+CONFIG_READ_OPTIONS = {"--get", "--get-all", "--get-regexp", "--get-urlmatch", "-l", "--list"}
+CONFIG_CHANGE_OPTIONS = {"--unset", "--unset-all", "--replace-all", "--add"}
+WORKTREE_SECONDS = 2
+
+
+def hooks_path_write(args):
+    """Do the words after `git config` set or unset core.hooksPath? A read (`--get`, `--list`,
+    the key alone) is not a write. Git keys ignore case."""
+    positional, flags, i = [], set(), 0
+    while i < len(args):
+        w = args[i]
+        if w.startswith("-") and w != "-":
+            flags.add(w)
+            i += 2 if w in CONFIG_VALUE_OPTIONS else 1
+        else:
+            positional.append(w)
+            i += 1
+    keys = [k for k, w in enumerate(positional) if w.lower() == "core.hookspath"]
+    if not keys or flags & CONFIG_READ_OPTIONS:
+        return False
+    if flags & CONFIG_CHANGE_OPTIONS or "unset" in (w.lower() for w in positional[:keys[0]]):
+        return True
+    return len(positional) > keys[0] + 1  # key and value; the key alone reads
+
+
+def git_calls(seg):
+    """(global options as (option, value), words from the subcommand on) for each `git` in a
+    simple command."""
+    for i, w in enumerate(seg):
+        if os.path.basename(w).lower() != "git":
+            continue
+        opts, j = [], i + 1
+        while j < len(seg) and seg[j].startswith("-"):
+            if seg[j] in GIT_OPTIONS_WITH_VALUE:
+                opts.append((seg[j], seg[j + 1] if j + 1 < len(seg) else ""))
+                j += 2
+            else:
+                opts.append((seg[j], ""))
+                j += 1
+        yield opts, seg[j:]
+
+
+def hooks_option(opts):
+    for opt, value in opts:
+        if opt == "-c" or opt == "--config-env":
+            key = value
+        elif opt.startswith("--config-env="):
+            key = opt.split("=", 1)[1]
+        else:
+            continue
+        if key.split("=", 1)[0].lower() == "core.hookspath":
+            return True
+    return False
+
+
+def git_state_hits(shell):
+    """What a checked command does to shared git state, from the words and text ShellCheck
+    already read: {"stash_dirs": folders to count worktrees in or None, "hooks_path": bool}, or
+    None. Costs work-budget steps; raises CheckTooLarge like the rest of the shell check."""
+    stash_dirs, stash, hooks = [], False, False
+    for seg, extra in shell.segments:
+        shell.tick()
+        for opts, rest in git_calls(seg):
+            sub = rest[0].lower() if rest else ""
+            if hooks_option(opts):
+                hooks = True
+            if sub == "config" and hooks_path_write(rest[1:]):
+                hooks = True
+            if sub == "stash" and (len(rest) < 2 or rest[1].lower() not in ("list", "show")):
+                stash = True
+                stash_dirs += extra or [shell.cwd]
+    for full, spans in shell.texts:
+        def counts(m):
+            return not any(a <= m.start() and m.end() <= b for a, b in spans)
+        for m in STASH_REGEX.finditer(full):
+            shell.tick()
+            if counts(m) and not stash:
+                stash = True
+        for m in GIT_HOOKS_OPTION_REGEX.finditer(full):
+            shell.tick()
+            hooks = hooks or counts(m)
+        for m in GIT_CONFIG_REGEX.finditer(full):
+            shell.tick()
+            words = [w.strip("'\"") for w in m.group(1).split()]
+            hooks = hooks or (counts(m) and hooks_path_write(words))
+    if not stash and not hooks:
+        return None
+    return {"stash": stash, "stash_dirs": stash_dirs, "hooks_path": hooks}
+
+
+def worktree_count(folder):
+    """Number of worktrees of the repository at folder, or None when git cannot say."""
+    try:
+        out = subprocess.run(["git", "--no-optional-locks", "-C", folder, "worktree", "list",
+                              "--porcelain"], capture_output=True, text=True,
+                             timeout=WORKTREE_SECONDS)
+    except Exception:
+        return None
+    if out.returncode != 0:
+        return None
+    blocks = out.stdout.strip().split("\n\n")
+    return sum(1 for b in blocks if b.startswith("worktree ") and "\nbare" not in "\n" + b)
+
+
+def git_state_ask(hits, cwd, cmd):
+    if hits["hooks_path"]:
+        return ("ask", "Command sets or unsets core.hooksPath, which replaces .git/hooks and "
+                "silently disables hooks such as Git LFS's pre-push. Needs the owner's OK. "
+                f"Command: {cmd[:200]}")
+    if hits["stash"]:
+        base = os.path.abspath(cwd or os.getcwd())
+        folders = list(dict.fromkeys(
+            os.path.abspath(f) for f in hits["stash_dirs"])) or [base]
+        if len(folders) > 4:
+            folders = folders[:4] + [None]
+        for folder in folders:
+            count = worktree_count(folder) if folder else None
+            if count is None:
+                return ("ask", "git stash: could not count worktrees (the stash is shared by "
+                        f"every worktree of a repo); approve manually. Command: {cmd[:200]}")
+            if count > 1:
+                return ("ask", f"git stash in a repo with {count} worktrees: the stash is shared "
+                        "by all of them, so another agent could pop or drop it. Needs the "
+                        f"owner's OK. Command: {cmd[:200]}")
+    return None

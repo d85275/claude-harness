@@ -116,7 +116,7 @@ class PushPolicyTests(GuardTestCase):
     def test_non_publishing_commands_are_not_caught(self):
         for policy in ("ask", "deny"):
             self.check(policy, [
-                "git status", "git stash push -m wip", "git log --oneline", "gh pr view 12",
+                "git status", "git stash list", "git log --oneline", "gh pr view 12",
                 "gh pr list", "gh release view v1", "git fetch origin", "git pull --ff-only",
                 "gh pr checks 12", "gh repo view", "gh gist list",
                 # a push mentioned only in a heredoc body that is data, not commands
