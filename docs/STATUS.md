@@ -38,4 +38,16 @@ CH-01 is done (c2efe7d). CH-02 is done (ef867a1). Tickets run one at a time (own
 
 - 2026-11-22: commit history keeps the owner's current email; no rewrite before publishing.
 - 2026-11-22: when several `harness.json` files apply, they merge and are never weaker (CH-01).
+- 2026-11-22: `pushPolicy: "allow"` stays; the guard also asks before shell commands that write protected configs (CH-03). Stricter push detection kept.
+- 2026-11-22: device presets switch on automatically in repos with an Xcode project or `gradlew` (CH-06).
 - 2026-11-22: deploy commands always ask, whatever `pushPolicy` says (CH-03).
+
+## Updating the installed plugin (later, after Milestone A)
+
+Repos that use the plugin run the installed copy (0.2.0 from GitHub) until the owner updates it, so work here does not affect them before then.
+
+1. Let each repo's coordinator finish and close its current ticket; start no new one.
+2. With no implementer or reviewer running anywhere, the owner pushes `main` and runs `/plugin update dev-harness`.
+3. Restart every Claude Code session in those repos (and this one).
+4. Check in one session: `dev-harness-config get pushPolicy` prints `ask`; asking Claude to run `git push` brings a permission prompt.
+5. Resume tickets.
