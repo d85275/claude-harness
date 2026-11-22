@@ -35,6 +35,7 @@ You implement one ticket. You did not plan it and you will not review it; an ind
 
 ## Report (concise)
 
+- **Risk check.** If your diff touches a high-risk category from the project's Harness section (or is riskier than the ticket's Review level assumed), say so first, with the files and why. The coordinator will then mark the ticket `high-risk`; redoing it with `implementer-advanced` is the owner's call.
 - Commit SHA, branch/worktree, base, diff stat.
 - Production files changed and why; flag any in a high-risk category.
 - Each command run and its result. Separate **verified** (ran it, saw it pass) from **not run** and **not possible here**.

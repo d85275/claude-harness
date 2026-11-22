@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""dev-harness-config: read the merged harness.json config.
+
+Usage: dev-harness-config get <key>
+
+Loads the merged config for the current directory (honours CLAUDE_PROJECT_DIR,
+see README "Configuration") and prints the value of a top-level key: scalars
+plainly, lists and objects as JSON.
+
+Exit codes: 0 ok; 1 the value was printed but the config had warnings (written
+to stderr); 2 unknown key or bad usage.
+"""
+import json
+import os
+import sys
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "hooks", "scripts"))
+import harness_config  # noqa: E402
+
+
+def main(argv):
+    if len(argv) != 3 or argv[1] != "get":
+        sys.stderr.write("usage: dev-harness-config get <key>\n")
+        return 2
+    cfg, errors = harness_config.load_config(os.getcwd())
+    key = argv[2]
+    if key not in cfg:
+        sys.stderr.write(f"dev-harness-config: unknown key {key!r}\n")
+        return 2
+    value = cfg[key]
+    if isinstance(value, bool):
+        print("true" if value else "false")
+    elif isinstance(value, (list, dict)) or value is None:
+        print(json.dumps(value))
+    else:
+        print(value)
+    if errors:
+        sys.stderr.write(harness_config.format_errors(errors))
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

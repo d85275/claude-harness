@@ -27,16 +27,26 @@ Then add a `## Harness` section to the project's `CLAUDE.md` (template: [`templa
 | Step | Command / agent | Gate |
 |---|---|---|
 | Plan | `/plan <intent>` | Owner approves scope, done-criteria, allowed files, stop conditions. Skip when a spec already defines the ticket. |
-| Implement | `/start-ticket <id>` -> `implementer` (Sonnet) | Own worktree, one commit, fresh evidence, nothing outward-facing. |
-| Review | `/review <id>` -> `reviewer` (Sonnet) or `high-risk-reviewer` (Opus), plus `silent-failure-hunter` for error/offline/recovery work | Reviewer verifies evidence itself; fixes loop back to the implementer; max 3 rounds, then the owner decides. |
+| Implement | `/start-ticket <id>` -> `implementer` (Sonnet), or `implementer-advanced` (Opus) when the ticket's Review level is `high-risk` | Own worktree, one commit, fresh evidence, nothing outward-facing. |
+| Review | `/review <id>` -> `reviewer` (Sonnet) or `high-risk-reviewer` (Opus, or Fable via `highRiskReviewerModel`), plus `silent-failure-hunter` for error/offline/recovery work | Reviewer verifies evidence itself; fixes loop back to the implementer; max 3 rounds, then the owner decides. |
 | Integrate | `/close-ticket <id>` | Cherry-pick, integrated check, remove worktree/branch/caches/test devices. Never pushes. |
 | Check drift | `/sync` | Plan and handoff docs vs. what is actually on the integration branch. |
 
-Model choice is deliberate: routine implementation and review run on Sonnet; Opus is reserved for high-risk review, where a missed bug costs the most.
+Model choice is deliberate, by alias only (never a pinned version), and there is no Haiku tier: routine implementation and review run on Sonnet; Opus is used where a missed bug costs the most.
+
+| Agent | Model / effort |
+|---|---|
+| `implementer` | Sonnet / medium |
+| `implementer-advanced` | Opus / high |
+| `reviewer`, `silent-failure-hunter` | Sonnet / high |
+| `high-risk-reviewer` | Opus / high; Fable when `highRiskReviewerModel` is `"fable"` |
+
+**Upgrade rule.** An implementer that finds its diff riskier than planned says so in its report. The coordinator then sets the ticket to `high-risk`, so review always goes to `high-risk-reviewer`. Whether to redo the implementation with `implementer-advanced` is the owner's call. `/plan` marks a ticket `high-risk` when unsure, with a one-line reason.
 
 ## Agents
 
 - **implementer** - one ticket, one worktree, one commit; reports verified vs. not-run vs. not-possible.
+- **implementer-advanced** - same rules, for `high-risk` tickets; Opus, with extra care for guards, credentials, git hooks and release.
 - **reviewer** - read-only; does not trust the implementer's report; judges only against the ticket's criteria.
 - **high-risk-reviewer** - read-only senior review for identity, payments, deletion, security, shared contracts, release.
 - **silent-failure-hunter** - read-only second lens for swallowed errors, catch-all fallbacks, and "unknown" collapsed into a definite answer.
@@ -74,7 +84,7 @@ A malformed file, an unknown key, a bad regex or a value of the wrong type is ne
 | `notify` | `true` | macOS notification when Claude needs you. |
 | `pushPolicy` | `"ask"` | `"ask"`, `"deny"` or `"allow"` for `git push` (enforced from CH-03). |
 | `presets` | `[]` | Opt-in rule sets (filled in from CH-06). |
-| `highRiskReviewerModel` | `"opus"` | `"opus"` or `"fable"` (used from CH-02). |
+| `highRiskReviewerModel` | `"opus"` | `"opus"` or `"fable"`; `/review` passes it as the model of `high-risk-reviewer`. |
 | `tickets.dirs` | `["docs/tickets"]` | Folders holding ticket files. |
 | `tickets.featureGlobs` | `[]` | Globs mapping files to features. |
 | `tickets.idPrefixes` | `{}` | Ticket ID prefix -> `{"platform": ..., "kind": ...}`. |
@@ -88,12 +98,15 @@ A malformed file, an unknown key, a bad regex or a value of the wrong type is ne
 
 ```text
 .claude-plugin/   plugin.json, marketplace.json
-agents/           implementer, reviewer, high-risk-reviewer, silent-failure-hunter
+bin/              dev-harness-config (on the Bash PATH while the plugin is enabled)
+agents/           implementer, implementer-advanced, reviewer, high-risk-reviewer, silent-failure-hunter
 commands/         plan, start-ticket, review, close-ticket, sync
 hooks/            hooks.json, scripts/guard.py, scripts/harness_config.py
 templates/        CLAUDE.md Harness section, harness.json
 tests/            guard and config loader tests
 ```
+
+`bin/dev-harness-config get <key>` prints one value of the merged config for the current directory (scalars plainly, lists and objects as JSON). Config warnings go to stderr with exit 1 (the value is still printed); an unknown key or bad usage exits 2. Commands use it because `CLAUDE_PLUGIN_ROOT` is not set in the Bash tool's environment.
 
 ## Credits
 

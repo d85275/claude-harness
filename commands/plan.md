@@ -13,7 +13,7 @@ Plan: **$ARGUMENTS**
    - **Files allowed** - paths or areas the implementer may touch.
    - **Done when** - testable acceptance criteria.
    - **Verify** - exact commands and the evidence each must produce.
-   - **Risk** - `ordinary` or `high-risk` (using the project's categories) -> which reviewer.
+   - **Risk** - `ordinary` or `high-risk` (using the project's categories) -> which reviewer, and which implementer (`high-risk` -> `implementer-advanced`). Mark `high-risk` when unsure, with a one-line reason.
    - **Depends on** - other tasks.
    - **Stop and ask if** - conditions that need the owner (new approvals, ambiguous requirements, production actions).
    - **Unknowns** - things you could not determine; keep them unknown, do not guess.
