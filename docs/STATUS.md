@@ -32,9 +32,10 @@ Goal: release **1.0** of the `dev-harness` plugin with a ticket system and a Jir
 
 ## Next
 
-CH-01. CH-02 to CH-06 depend only on CH-01 and may run in parallel after it.
+CH-01 is done (c2efe7d). Next: CH-02 to CH-07; all depend only on CH-01 and may run in parallel (CH-03 is high-risk).
 
 ## Owner decisions
 
 - 2026-11-22: commit history keeps the owner's current email; no rewrite before publishing.
+- 2026-11-22: when several `harness.json` files apply, they merge and are never weaker (CH-01).
 - 2026-11-22: deploy commands always ask, whatever `pushPolicy` says (CH-03).

@@ -6,7 +6,7 @@ States: `Planned`, `In progress`, `In review`, `Fixing`, `Owner check`, `Done`, 
 
 | ID | Title | Review | State | Commit | Note |
 |---|---|---|---|---|---|
-| [CH-01](CH-01.md) | One `harness.json` schema and shared config loader | standard + SF | Fixing | | Review round 2: fixing lookup and crash paths |
+| [CH-01](CH-01.md) | One `harness.json` schema and shared config loader | standard + SF | Done | c2efe7d | 3 review rounds; configs merge (owner) |
 | [CH-02](CH-02.md) | Model tiers and implementer routing | standard | Planned | | |
 | [CH-03](CH-03.md) | Push policy | high-risk | Planned | | Deploys always ask (owner, 2026-11-22) |
 | [CH-04](CH-04.md) | Stash and `core.hooksPath` guards | standard | Planned | | |
