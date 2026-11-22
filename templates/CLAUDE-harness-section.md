@@ -14,4 +14,5 @@
 - **Build caches and devices**: shared cache `<path>`; parallel tickets use `<path>-<id>`; cleanup at close: `<commands>`.
 - **High-risk categories** (use `high-risk-reviewer`): authentication/accounts, payments/entitlements, deletion/migration, security rules/secrets, shared backend contracts, release/signing.
 - **Review policy**: high-risk -> `implementer-advanced` and `high-risk-reviewer`; everything else -> `implementer` and `reviewer` (or coordinator self-review for docs/test-only changes). Tiers: `implementer` Sonnet, `implementer-advanced` Opus, `high-risk-reviewer` Opus (Fable via `highRiskReviewerModel`). Upgrade rule: an implementer that finds its diff riskier than planned says so in its report; the coordinator sets the ticket to `high-risk` so review goes to `high-risk-reviewer`; redoing it with `implementer-advanced` is the owner's call.
+- **Coordinator (main session)**: run it on Opus (`/model opus`). It plans, routes tickets, judges review reports and keeps the docs; the plugin's agents pick their own models.
 - **Boundaries - stop and ask the owner**: production deploys, shared databases, store consoles, signing keys, anything outward-facing.

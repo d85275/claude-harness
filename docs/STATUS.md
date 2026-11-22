@@ -14,7 +14,7 @@ Goal: release **1.0** of the `dev-harness` plugin with a ticket system and a Jir
   - read-only parser check against real projects to a temp folder (nothing copied into this repo)
   - acceptance: re-run `/ticket-init` on this repo
 - **C. Ready to publish**:
-  - **README rewrite** (owner request 2026-11-22), so a newcomer understands what the plugin does:
+  - **README rewrite** (owner request 2026-11-22; working draft in [`README-draft.md`](README-draft.md)), so a newcomer understands what the plugin does:
     - an opening paragraph on the problem it solves and who it is for
     - a picture of the plan -> implement -> review -> integrate loop
     - a short worked example of one ticket going through it
