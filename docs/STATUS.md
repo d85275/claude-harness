@@ -32,7 +32,7 @@ Goal: release **1.0** of the `dev-harness` plugin with a ticket system and a Jir
 
 ## Next
 
-CH-01 is done (c2efe7d). CH-02 is done (ef867a1). Tickets run one at a time (owner, 2026-11-22). Next: CH-03 (high-risk, in review), then CH-08 (split `guard.py`, high-risk), then CH-04 to CH-07.
+CH-01 is done (c2efe7d). CH-02 is done (ef867a1). CH-03 is done (b999c7d). Tickets run one at a time (owner, 2026-11-22). Next: CH-08 (split `guard.py`, high-risk), then CH-04 to CH-07.
 
 ## Owner decisions
 
