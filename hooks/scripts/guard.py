@@ -8,11 +8,11 @@ PreToolUse JSON decision on stdout so the owner is prompted.
 
 Project overrides: <project>/.claude/harness.json
   {
-    "protectedPaths":   ["android/keys/**", "backend/service-account.json"],
-    "protectedConfigs": ["ios/scripts/verify_visual_parity_baseline.py"],
-    "askCommands":      ["firebase firestore:delete", "./deploy.sh"],
+    "protectedPaths":   ["keys/**", "config/service-account.json"],
+    "protectedConfigs": ["scripts/verify_thresholds.py"],
+    "askCommands":      ["./scripts/deploy.sh"],
     "checkWeakening":   true,
-    "weakeningMarkers": ["\\bExclusion\\("],
+    "weakeningMarkers": [],
     "notify": true,
     "pushPolicy": "ask"
   }
