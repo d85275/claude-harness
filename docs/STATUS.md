@@ -4,7 +4,7 @@ Goal: release **1.0** of the `dev-harness` plugin with a ticket system and a Jir
 
 ## Milestones
 
-- **A. Foundations** (tickets CH-01 to CH-09, [tracker](tickets/tracker.md)): one `harness.json` schema, model tiers, push policy and other guard additions.
+- **A. Foundations** (tickets CH-01 to CH-10, [tracker](tickets/tracker.md)): one `harness.json` schema, model tiers, push policy and other guard additions.
 - **B. Ticket system and board** (tickets to be written when A is integrated):
   - `/ticket-init`
   - board script: self-contained HTML, `--check`, standard library only
@@ -23,6 +23,8 @@ Goal: release **1.0** of the `dev-harness` plugin with a ticket system and a Jir
   - read-only parser check against real projects to a temp folder (nothing copied into this repo)
   - acceptance: re-run `/ticket-init` on this repo
   - `/ticket-init` adopts an existing tracker and ticket files without rewriting them (both private projects already have real tickets)
+  - migration of existing tickets (owner, 2026-11-23): dry run first (`/ticket-init --check` writes nothing and reports ticket counts against the old board, unknown states, files without rows, rows without files, broken links); differences are mapped through settings (state names, archive and feature folders, ID prefixes, extra columns, old evidence locations), never by rewriting old tickets; the plugin's board must match the old board before switching; the switch is one revertible commit
+  - the Harness section template that `/ticket-init` writes says ticket-flow changes go to the dev-harness plugin as a request, not into the project's own scripts
   - after the 1.0 plugin update, each project switches over in a ticket run by its own coordinator: run `/ticket-init`; a project with its own board script and board hooks removes them and keeps its extra columns through settings (owner, 2026-11-23)
 - **C. Ready to publish**:
   - **README rewrite** (owner request 2026-11-22; working draft in [`README-draft.md`](README-draft.md)), so a newcomer understands what the plugin does:
@@ -43,7 +45,7 @@ Goal: release **1.0** of the `dev-harness` plugin with a ticket system and a Jir
 
 ## Next
 
-CH-01 is done (c2efe7d). CH-02 is done (ef867a1). CH-03 is done (b999c7d). CH-08 is done (99aedc3). Tickets run one at a time (owner, 2026-11-22), except that CH-06 may run alongside one other ticket (owner, 2026-11-22). CH-04 is done (19319cb). CH-06 is done (2b18eb4). CH-05 is done (a7497ff). Running: CH-07. Then CH-09 (feature-branch pushes, high-risk), then Milestone B (owner, 2026-11-23). Every remaining ticket has an explicit catch list and at most 2 review rounds (owner, 2026-11-22).
+CH-01 is done (c2efe7d). CH-02 is done (ef867a1). CH-03 is done (b999c7d). CH-08 is done (99aedc3). Tickets run one at a time (owner, 2026-11-22), except that CH-06 may run alongside one other ticket (owner, 2026-11-22). CH-04 is done (19319cb). CH-06 is done (2b18eb4). CH-05 is done (a7497ff). Running: CH-07. Then CH-10 (heredoc text is data, high-risk), then CH-09 (feature-branch pushes, high-risk), then Milestone B (owner, 2026-11-23). Every remaining ticket has an explicit catch list and at most 2 review rounds (owner, 2026-11-22).
 
 ## Owner decisions
 
@@ -52,6 +54,8 @@ CH-01 is done (c2efe7d). CH-02 is done (ef867a1). CH-03 is done (b999c7d). CH-08
 - 2026-11-22: `pushPolicy: "allow"` stays; the guard also asks before shell commands that write protected configs (CH-03). Stricter push detection kept.
 - 2026-11-22: device presets switch on automatically in repos with an Xcode project or `gradlew` (CH-06).
 - 2026-11-22: deploy commands always ask, whatever `pushPolicy` says (CH-03).
+- 2026-11-23: once a project has switched to the plugin's ticket system, ticket-flow changes (states, start/review/close steps, board, git hooks, guards) go through this plugin; projects keep only their settings.
+- 2026-11-23: CH-10 (heredoc text is data) runs before CH-09.
 - 2026-11-23: a guard crash on a credential-like call asks instead of allowing (CH-07).
 - 2026-11-23: new `pushPolicy: "feature-branches"`: agents (main session and subagents) may push feature branches without a prompt, never `main`/`master`; anything the guard can't prove asks (CH-09). Replaces the CH-07 subagent-push item.
 

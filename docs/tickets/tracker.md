@@ -14,4 +14,5 @@ States: `Planned`, `In progress`, `In review`, `Fixing`, `Owner check`, `Done`, 
 | [CH-06](CH-06.md) | Device rules as presets, auto-on for mobile projects | standard | Done | 2b18eb4 | 1 review round; paused once by the old installed guard |
 | [CH-07](CH-07.md) | Close remaining fail-open paths in the guard | standard + SF | In progress | | From CH-01 review |
 | [CH-08](CH-08.md) | Split `guard.py` into scanner, Bash rules and hook entry | high-risk | Done | 99aedc3 | 1 high-risk round; output identical to main |
-| [CH-09](CH-09.md) | Push policy that lets agents push feature branches, never `main` | high-risk | Planned | | Owner request 2026-11-23; after CH-07 |
+| [CH-09](CH-09.md) | Push policy that lets agents push feature branches, never `main` | high-risk | Planned | | Owner request 2026-11-23; after CH-10 |
+| [CH-10](CH-10.md) | Text written into a file by a data heredoc is not a command | high-risk | Planned | | Owner 2026-11-23: after CH-07, before CH-09; paused CH-06 and CH-07 |
