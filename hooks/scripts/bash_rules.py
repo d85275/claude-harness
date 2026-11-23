@@ -20,8 +20,9 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 if _HERE not in sys.path:  # python3 -I omits it
     sys.path.insert(0, _HERE)
 import harness_config  # noqa: E402
-from shell_check import (DEFAULT_PROTECTED_CONFIGS, GIT_OPTIONS_WITH_VALUE, _OPTS,  # noqa: E402, F401
-                         ShellCheck)
+from shell_check import (DATA_TEXT_UNSAFE, DEFAULT_PROTECTED_CONFIGS,  # noqa: E402, F401
+                         GIT_OPTIONS_WITH_VALUE, SHADOWED_OWNER, _OPTS, ShellCheck,
+                         data_text_unsafe, outside_and_openings)
 import shell_scan  # noqa: E402
 from shell_scan import CheckTooLarge  # noqa: E402
 
@@ -66,24 +67,6 @@ PRESET_MARKERS = {
 SKIP_DIRS = ("node_modules",)  # plus every dot folder: never listed one level down
 CREDENTIAL_SECONDS = 4  # time for the credential pass; the hook timeout (10 s) would allow
 NOTICES = []  # warnings from the last check(); guard.py shows them as systemMessage
-# The data-heredoc owners (cat, tee, git) redefined, or a write target that is not a plain file.
-SHADOWED_OWNER = re.compile(
-    r"\balias\b|\bfunction\s+(?:cat|tee|git)\b|\b(?:cat|tee|git)\s*\(\s*\)|\bPATH\+?=|\bhash\b"
-    r"|\bmkfifo\b|\bexec\b[^\n;&|]*[<>]")
-# When one of these holds, the scanner and bash may disagree about where a body is or what writes
-# it, so nothing is exempt (fail closed). Each gets (command, text outside the bodies, opening
-# lines of the data heredocs).
-DATA_TEXT_UNSAFE = {
-    # bash keeps a "\r" in the delimiter word ("EOF\r"); the scanner stops before it.
-    "crlf": lambda cmd, outside, openings: "\r" in cmd,
-    # The scanner can misread a nested quote in ${...} and take a "#" for a comment.
-    "comment": lambda cmd, outside, openings: "#" in outside or "${" in outside,
-    "shadowed owner": lambda cmd, outside, openings: SHADOWED_OWNER.search(outside) is not None,
-    "device target": lambda cmd, outside, openings: any(
-        "/dev/" in line or "/proc/" in line for line in openings),
-}
-
-
 class DataText:
     """The command as the credential and device-reset rules read it (CH-10): a hit that lies
     entirely inside the body of a proven data heredoc (CH-03's spans from shell_scan.scan_shell,
@@ -102,14 +85,8 @@ class DataText:
         self.full = full  # backslash-newlines joined, as bash reads them
         if not spans:
             return
-        pieces, last = [], 0
-        for a, b in spans:
-            pieces.append(full[last:a])
-            last = b
-        pieces.append(full[last:])
-        outside = "".join(pieces)
-        openings = [full[full.rfind("\n", 0, a - 1) + 1:a] for a, _ in spans]
-        if any(unsafe(cmd, outside, openings) for unsafe in DATA_TEXT_UNSAFE.values()):
+        outside, openings = outside_and_openings(full, spans)
+        if data_text_unsafe(cmd, outside, openings):
             return
         self.spans, self.outside = spans, outside
 

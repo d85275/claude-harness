@@ -914,3 +914,115 @@ EOF
 tee /proc/self/fd/1 <<'EOF'
 cat /x/.env.local
 EOF
+=== none=ask ask=ask deny=block allow=allow
+echo "${x:-"a # b"}"
+cat > t.txt <<'EOF'
+git push origin HEAD
+EOF
+=== all=ask
+echo "${x:-"a # b"}"
+cat > t.txt <<'EOF'
+> .eslintrc.json
+EOF
+=== none=ask ask=ask deny=block allow=allow
+echo hi # note
+cat > t.txt <<'EOF'
+git push origin HEAD
+EOF
+=== all=ask
+echo hi # note
+cat > t.txt <<'EOF'
+> .eslintrc.json
+EOF
+=== none=ask ask=ask deny=block allow=allow
+cat() { bash; }
+cat > t.txt <<'EOF'
+git push origin HEAD
+EOF
+=== all=ask
+cat() { bash; }
+cat > t.txt <<'EOF'
+> .eslintrc.json
+EOF
+=== none=ask ask=ask deny=block allow=allow
+function tee { bash; }
+cat > t.txt <<'EOF'
+git push origin HEAD
+EOF
+=== all=ask
+function tee { bash; }
+cat > t.txt <<'EOF'
+> .eslintrc.json
+EOF
+=== none=ask ask=ask deny=block allow=allow
+git() { bash; }
+cat > t.txt <<'EOF'
+git push origin HEAD
+EOF
+=== all=ask
+git() { bash; }
+cat > t.txt <<'EOF'
+> .eslintrc.json
+EOF
+=== none=ask ask=ask deny=block allow=allow
+alias cat=bash
+cat > t.txt <<'EOF'
+git push origin HEAD
+EOF
+=== all=ask
+alias cat=bash
+cat > t.txt <<'EOF'
+> .eslintrc.json
+EOF
+=== none=ask ask=ask deny=block allow=allow
+PATH=/tmp/bin:$PATH
+cat > t.txt <<'EOF'
+git push origin HEAD
+EOF
+=== all=ask
+PATH=/tmp/bin:$PATH
+cat > t.txt <<'EOF'
+> .eslintrc.json
+EOF
+=== none=ask ask=ask deny=block allow=allow
+hash -p /bin/sh cat
+cat > t.txt <<'EOF'
+git push origin HEAD
+EOF
+=== all=ask
+hash -p /bin/sh cat
+cat > t.txt <<'EOF'
+> .eslintrc.json
+EOF
+=== none=ask ask=ask deny=block allow=allow
+mkfifo /tmp/p
+cat > t.txt <<'EOF'
+git push origin HEAD
+EOF
+=== all=ask
+mkfifo /tmp/p
+cat > t.txt <<'EOF'
+> .eslintrc.json
+EOF
+=== none=ask ask=ask deny=block allow=allow
+exec 3>/tmp/x
+cat > t.txt <<'EOF'
+git push origin HEAD
+EOF
+=== all=ask
+exec 3>/tmp/x
+cat > t.txt <<'EOF'
+> .eslintrc.json
+EOF
+=== none=ask ask=ask deny=block allow=allow
+cat > /dev/stdout <<'EOF'
+git push origin HEAD
+EOF
+=== all=ask
+cat > /dev/stdout <<'EOF'
+> .eslintrc.json
+EOF
+=== all=allow
+git commit -F - <<'EOF'
+note: git push later
+EOF

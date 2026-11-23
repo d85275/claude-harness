@@ -49,6 +49,41 @@ CODE_OPTION = re.compile(r"-[a-zA-Z]*[ceE]|--eval|--print|-p")  # the next word 
 RAW_REDIRECT = re.compile(r"(?:>>?|>\||&>>?)[ \t]*[\"']?([^\s;&|<>()\"'`]+)")
 CASE_INSENSITIVE = sys.platform == "darwin"  # the default macOS filesystem ignores case
 
+# The data-heredoc owners (cat, tee, git) redefined, or a write target that is not a plain file.
+SHADOWED_OWNER = re.compile(
+    r"\balias\b|\bfunction\s+(?:cat|tee|git)\b|\b(?:cat|tee|git)\s*\(\s*\)|\bPATH\+?=|\bhash\b"
+    r"|\bmkfifo\b|\bexec\b[^\n;&|]*[<>]")
+# When one of these holds, the scanner and bash may disagree about where a body is or what writes
+# it, so nothing is exempt (fail closed). Each gets (command, text outside the bodies, opening
+# lines of the data heredocs). Shared by ShellCheck.run (push and config rules, CH-12) and
+# DataText (credential and device rules, CH-10): one table.
+DATA_TEXT_UNSAFE = {
+    # bash keeps a "\r" in the delimiter word ("EOF\r"); the scanner stops before it.
+    "crlf": lambda cmd, outside, openings: "\r" in cmd,
+    # The scanner can misread a nested quote in ${...} and take a "#" for a comment.
+    "comment": lambda cmd, outside, openings: "#" in outside or "${" in outside,
+    "shadowed owner": lambda cmd, outside, openings: SHADOWED_OWNER.search(outside) is not None,
+    "device target": lambda cmd, outside, openings: any(
+        "/dev/" in line or "/proc/" in line for line in openings),
+}
+
+
+
+
+def outside_and_openings(full, spans):
+    """The text outside every data heredoc body, and the opening line of each body."""
+    pieces, last = [], 0
+    for a, b in spans:
+        pieces.append(full[last:a])
+        last = b
+    pieces.append(full[last:])
+    openings = [full[full.rfind("\n", 0, a - 1) + 1:a] for a, _ in spans]
+    return "".join(pieces), openings
+
+
+def data_text_unsafe(cmd, outside, openings):
+    return any(unsafe(cmd, outside, openings) for unsafe in DATA_TEXT_UNSAFE.values())
+
 
 class ConfigMatcher:
     """Does a path (or glob, or folder) written by a command hit a protected config? Matches on
@@ -118,6 +153,8 @@ class ShellCheck(shell_scan.Budget):
         if len(cmd) > shell_scan.LONGEST_COMMAND:
             raise CheckTooLarge()
         full, spans = self.analyze(cmd, [self.cwd], 0)
+        if spans and data_text_unsafe(cmd, *outside_and_openings(full, spans)):
+            spans = []  # scanner and bash may disagree about the bodies: no hit is text
 
         def counts(match):  # a hit inside a data heredoc body is not a command
             return not any(a <= match.start() and match.end() <= b for a, b in spans)
