@@ -19,7 +19,7 @@ These guards are best-effort. They match command text, so indirect forms (script
 
 ### Prerequisites
 
-Claude Code, git, Python 3.9 or newer and `/bin/sh`. macOS is the main target. Linux should work (not tested there); desktop notifications are macOS only. The plugin has no other dependencies.
+Claude Code, git, Python 3.9 or newer and `/bin/sh`. macOS is the main target. Linux is covered by the test workflow in `.github/workflows/test.yml` (Ubuntu and macOS, Python 3.9 and 3.13), which has not run yet, so treat Linux as untested until it has; desktop notifications are macOS only. The plugin has no other dependencies.
 
 ### Install
 

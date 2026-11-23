@@ -1,0 +1,45 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        # Pinned runner images so the matrix does not move under us. If the macOS 3.9 leg fails on the
+        # first run (macos-15 is arm64), fall back to macos-15-intel for 3.9, or make 3.10 the macOS floor.
+        os: [ubuntu-24.04, macos-15]
+        python: ["3.9", "3.13"]   # oldest supported (README Prerequisites) and a recent one
+    env:
+      # The real-git tests isolate HOME and the global git config themselves; this identity is a fallback.
+      GIT_AUTHOR_NAME: ci
+      GIT_AUTHOR_EMAIL: ci@example.invalid
+      GIT_COMMITTER_NAME: ci
+      GIT_COMMITTER_EMAIL: ci@example.invalid
+    steps:
+      # Action SHAs verified against the tags named below with `git ls-remote` on 2026-11-23.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b  # v5.3.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Static checks
+        run: |
+          python3 -m py_compile hooks/scripts/*.py board/*.py
+          sh -n templates/githooks/hook.sh
+          if command -v dash >/dev/null 2>&1; then dash -n templates/githooks/hook.sh; fi
+      - name: Tests
+        env:
+          TMPDIR: ${{ runner.temp }}
+        run: python3 -m unittest discover -s tests

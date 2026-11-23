@@ -645,7 +645,10 @@ class NeverFails(Env):
             time.sleep(0.1)
         self.assertEqual(len(self.leftovers()), 2)      # stdin copy and stderr file
         proc.send_signal(signal.SIGTERM)
-        proc.communicate(timeout=30)
+        # Not communicate(): stdin is already closed, and Python 3.9's communicate() flushes it (ValueError).
+        proc.wait(timeout=30)
+        proc.stdout.close()
+        proc.stderr.close()
         self.assertEqual(proc.returncode, 143)
         self.assertEqual(self.leftovers(), [])
 

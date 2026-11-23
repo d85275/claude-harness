@@ -179,10 +179,13 @@ class CostTests(GuardTestCase):
                                     + "\n".join(f"K_{i}=v_{i}" for i in range(2000)) + "\nEOF",
             "1000 heredocs": "\n".join(f"cat > /tmp/f{i} <<E\nx\nE" for i in range(1000)),
         }
+        # The python3 heredoc case takes ~1.02 s CPU on Python 3.9. 3 s is still well under the 7 s check
+        # deadline (hook timeout 10 s), with headroom for slow CI runners. Every other case keeps 1 s.
+        limits = {"100KB python3 - heredoc": 3.0}
         for name, cmd in cases.items():
             with self.subTest(name=name):
                 self.assertGreater(len(cmd), 10000)
-                self.assertFast(cmd)
+                self.assertFast(cmd, limit=limits.get(name, 1.0))
 
     def test_pathological_regex_inputs(self):
         for cmd in ["git " + "-a " * 40 + "status", "true; git " + "-a " * 40 + "status",
