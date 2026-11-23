@@ -5,6 +5,7 @@ check() returns the decision for one command, or None to allow; guard.py prints 
 The shell text is read by shell_scan.py, and the push and config-write pass is ShellCheck in
 shell_check.py. The structural rule: the publish and redirect regexes read the full text, and
 scanner knowledge only removes a hit inside a proven data heredoc body (see ShellCheck.run).
+The credential and device-reset rules drop such a hit the same way, from the same spans (DataText).
 """
 import fnmatch
 import os
@@ -62,8 +63,63 @@ PRESET_MARKERS = {
 SKIP_DIRS = ("node_modules",)  # plus every dot folder: never listed one level down
 CREDENTIAL_SECONDS = 4  # time for the credential pass; the hook timeout (10 s) would allow
 NOTICES = []  # warnings from the last check(); guard.py shows them as systemMessage
+# The data-heredoc owners (cat, tee, git) redefined, or a write target that is not a plain file.
+SHADOWED_OWNER = re.compile(
+    r"\balias\b|\bfunction\s+(?:cat|tee|git)\b|\b(?:cat|tee|git)\s*\(\s*\)|\bPATH\+?=|\bhash\b"
+    r"|\bmkfifo\b|\bexec\b[^\n;&|]*[<>]")
+# When one of these holds, the scanner and bash may disagree about where a body is or what writes
+# it, so nothing is exempt (fail closed). Each gets (command, text outside the bodies, opening
+# lines of the data heredocs).
+DATA_TEXT_UNSAFE = {
+    # bash keeps a "\r" in the delimiter word ("EOF\r"); the scanner stops before it.
+    "crlf": lambda cmd, outside, openings: "\r" in cmd,
+    # The scanner can misread a nested quote in ${...} and take a "#" for a comment.
+    "comment": lambda cmd, outside, openings: "#" in outside or "${" in outside,
+    "shadowed owner": lambda cmd, outside, openings: SHADOWED_OWNER.search(outside) is not None,
+    "device target": lambda cmd, outside, openings: any(
+        "/dev/" in line or "/proc/" in line for line in openings),
+}
 
 
+class DataText:
+    """The command as the credential and device-reset rules read it (CH-10): a hit that lies
+    entirely inside the body of a proven data heredoc (CH-03's spans from shell_scan.scan_shell,
+    the same ones ShellCheck uses) is not a hit. When no body is proven data, the command cannot
+    be scanned (NUL byte, over the size cap, any error), or a DATA_TEXT_UNSAFE check holds,
+    nothing is exempt and the rules read the command exactly as before."""
+
+    def __init__(self, cmd):
+        self.cmd, self.full, self.spans, self.outside = cmd, cmd, [], cmd
+        if "\x00" in cmd or len(cmd) > shell_scan.LONGEST_COMMAND:
+            return
+        try:
+            full, _, _, spans, _ = shell_scan.scan_shell(cmd)
+        except Exception:
+            return
+        self.full = full  # backslash-newlines joined, as bash reads them
+        if not spans:
+            return
+        pieces, last = [], 0
+        for a, b in spans:
+            pieces.append(full[last:a])
+            last = b
+        pieces.append(full[last:])
+        outside = "".join(pieces)
+        openings = [full[full.rfind("\n", 0, a - 1) + 1:a] for a, _ in spans]
+        if any(unsafe(cmd, outside, openings) for unsafe in DATA_TEXT_UNSAFE.values()):
+            return
+        self.spans, self.outside = spans, outside
+
+    def inside(self, start, end):
+        return any(a <= start and end <= b for a, b in self.spans)
+
+    def search(self, pattern):
+        """Does the pattern hit the command outside every data heredoc body? It reads the text
+        with the bodies cut out, then the joined full text, where only a match lying entirely
+        inside one body is dropped (a match that only starts or ends in a body counts)."""
+        if re.search(pattern, self.outside):
+            return True
+        return any(not self.inside(m.start(), m.end()) for m in re.finditer(pattern, self.full))
 
 
 def matches(path, globs, cwd, roots=()):
@@ -151,8 +207,9 @@ def check(cmd, cfg, cwd, roots):
     del NOTICES[:]
     if not cmd:
         return None
+    text = DataText(cmd)
     for preset, (patterns, busy) in MACHINE_WIDE_RESETS.items():
-        if not any(re.search(p, cmd) for p in patterns):
+        if not any(text.search(p) for p in patterns):
             continue
         if not preset_active(preset, cfg, roots, cwd):
             continue
@@ -171,14 +228,17 @@ def check(cmd, cfg, cwd, roots):
     # The credential pass. Under the size cap it reads shell words (shlex); past it, plain whitespace
     # words (shlex is quadratic in one long word). Either way a hit blocks as always, and a
     # deadline (well under the 10 s hook timeout, which would allow) turns "ran out of time" into ask.
+    # Paths are read outside data heredoc bodies only (CH-10); the read verb may be anywhere.
     deadline = time.monotonic() + CREDENTIAL_SECONDS
     too_large = len(cmd) > shell_scan.LONGEST_COMMAND
     try:
-        tokens = cmd.split() if too_large else shlex.split(cmd, posix=True)
+        tokens = text.outside.split() if too_large else shlex.split(text.outside, posix=True)
     except ValueError:
-        tokens = cmd.split()
+        tokens = text.outside.split()
     tokens = list(dict.fromkeys(tokens))
     words = {os.path.basename(t) for t in tokens}
+    if text.spans:
+        words |= {os.path.basename(t) for t in cmd.split()}
     protected = DEFAULT_PROTECTED_PATHS + cfg.get("protectedPaths", [])
     if words & READ_VERBS:
         for t in tokens:

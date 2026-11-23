@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GUARD = os.path.join(HERE, "..", "hooks", "scripts", "guard.py")
@@ -66,6 +67,10 @@ class CorpusTests(unittest.TestCase):
         for setup in SETUPS:
             d = os.path.join(cls.tmp.name, setup)
             os.makedirs(os.path.join(d, ".claude"))
+            # Both device presets on (marker files), and another build always "running" (the
+            # busy check is stubbed below), so a device-reset row blocks wherever the rule fires.
+            os.makedirs(os.path.join(d, "App.xcodeproj"))
+            open(os.path.join(d, "gradlew"), "w").close()
             if setup != "none":
                 with open(os.path.join(d, ".claude", "harness.json"), "w") as f:
                     json.dump({"pushPolicy": setup,
@@ -76,9 +81,13 @@ class CorpusTests(unittest.TestCase):
                                     "user.email=t@example.invalid", *args],
                                    check=True, capture_output=True, env=GIT_ENV, timeout=20)
             cls.dirs[setup] = d
+        cls.busy = mock.patch.object(cls.guard.bash_rules, "other_build_running",
+                                     return_value=True)
+        cls.busy.start()
 
     @classmethod
     def tearDownClass(cls):
+        cls.busy.stop()
         cls.tmp.cleanup()
 
     def decide(self, cmd, cwd):

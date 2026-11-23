@@ -10,6 +10,8 @@
 # is a one-worktree repo (allow). Two worktrees: tests/test_git_state.py.
 # Setups (tests/test_guard_corpus.py): none = no harness.json; ask, deny = that pushPolicy plus
 # protectedConfigs ["scripts/verify_thresholds.py"]; allow = the same, committed in a local repo.
+# Every setup holds App.xcodeproj and gradlew (both device presets on) and the busy check is stubbed
+# to "another build is running", so a device-reset row blocks wherever the rule fires.
 === none=ask ask=ask deny=block allow=allow
 git commit -m "$(echo "Closes #12")" && git push origin HEAD
 === none=ask ask=ask deny=block allow=allow
@@ -644,3 +646,233 @@ git commit --amend --no-edit
 make test && git commit -am "fix"
 === all=allow
 git -C . commit -m "msg"
+
+=== all=block # CH-10: credential paths and device resets written by a data heredoc are text
+killall Simulator
+=== all=block
+xcrun simctl erase all
+=== all=block
+adb emu kill
+=== all=block
+xcrun simctl \
+  erase all
+=== all=block
+cat /x/.env.local
+=== all=block
+cat /tmp/AuthKey_AB.p8
+=== all=allow
+cat > tests/t.py <<'EOF'
+ENV = "/x/.env.local"
+EOF
+=== all=allow
+cat > tests/t.py <<'EOF'
+KEY = "/tmp/AuthKey_AB.p8"
+EOF
+=== all=allow
+cat > tests/t.py <<'EOF'
+CMD = "killall Simulator"
+EOF
+=== all=allow
+cat > tests/t.py <<'EOF'
+CMD = "xcrun simctl erase all"
+EOF
+=== all=allow
+cat > tests/t.py <<'EOF'
+ENV = "/x/.env.local"
+KEY = "/tmp/AuthKey_AB.p8"
+CMDS = ["killall Simulator", "xcrun simctl erase all", "adb emu kill"]
+EOF
+=== all=allow
+cat >> tests/t.py <<'EOF'
+ENV = "/x/.env.local"
+KEY = "/tmp/AuthKey_AB.p8"
+CMDS = ["killall Simulator", "xcrun simctl erase all", "adb emu kill"]
+EOF
+=== all=allow
+tee tests/t.py <<'EOF'
+ENV = "/x/.env.local"
+KEY = "/tmp/AuthKey_AB.p8"
+CMDS = ["killall Simulator", "xcrun simctl erase all", "adb emu kill"]
+EOF
+=== all=allow
+tee -a tests/t.py <<'EOF'
+cat /tmp/AuthKey_AB.p8
+killall Simulator
+EOF
+=== all=allow
+cat <<'EOF' > tests/t.py
+cat /x/.env.local
+xcrun simctl erase all
+EOF
+=== all=allow
+cat > tests/t.py <<EOF
+cat /x/.env.local
+killall Simulator
+EOF
+=== all=allow
+mkdir -p tests && cat > tests/t.py <<'EOF'
+cat /x/.env.local
+killall Simulator
+EOF
+=== all=allow
+git commit -F - <<'EOF'
+docs: never cat .env in examples
+
+Keep .env and .env.local out of the logs.
+EOF
+=== all=allow
+git tag -a v1 -F - <<'EOF'
+release: grep .env no longer needed
+EOF
+=== all=allow # gap: SSH private keys without a key suffix are not in the default protectedPaths
+cat ~/.ssh/id_rsa
+=== all=block
+cat ~/.ssh/deploy.pem
+=== all=block
+cat .env
+=== all=block
+cat > out.txt <<'EOF'
+notes
+EOF
+cat .env
+=== all=block
+cat > out.txt <<'EOF'; cat .env
+notes
+EOF
+=== all=block
+cat > out.txt <<'EOF'
+cat .env
+EOF
+cat /tmp/AuthKey_AB.p8
+=== all=block
+cat > out.txt <<'EOF'
+notes
+EOF
+killall Simulator
+=== all=block
+cat <<'EOF' | sh
+killall Simulator
+EOF
+=== all=block
+bash <<'EOF'
+killall Simulator
+EOF
+=== all=block
+cat <<'EOF' | bash
+cat /x/.env.local
+EOF
+=== all=block
+python3 - <<'EOF'
+p = "/tmp/AuthKey_AB.p8"
+EOF
+=== all=block
+node - <<'EOF'
+const p = "/x/.env.local"
+EOF
+=== all=allow # gap: a credential word glued to ")" (".env)") is not matched; not a data body either
+cat > out.txt <<EOF
+value=$(cat .env)
+EOF
+=== all=block
+cat > out.txt <<EOF
+value=$(cat .env )
+EOF
+=== all=block
+cat > out.txt <<EOF
+value=$(cat /tmp/AuthKey_AB.p8 )
+killall Simulator
+EOF
+=== all=block
+cat > out.txt <<EOF
+value=`cat .env `
+EOF
+=== all=block
+cat > run.sh <<'EOF'
+killall Simulator
+EOF
+sh run.sh
+=== all=block
+cat > run.sh <<'EOF'
+cat /x/.env.local
+EOF
+sh run.sh
+=== all=block
+cat > a.txt <<'EOF'
+notes
+EOF
+cat > b.txt <<'EOF'
+notes
+EOF
+cat .env
+=== all=block
+cat > out.txt <<'EOF'
+notes
+EOF
+xcrun simctl \
+  erase all
+=== all=block
+cat > out.txt <<'EOF' && cat .env
+notes
+EOF
+=== all=block # the read verb may sit in a data body; a path outside it still blocks
+git commit -F - <<'EOF'
+cat
+EOF
+ls /x/.env.local
+=== all=block # fail closed: a comment outside the bodies (CRLF: test_data_heredoc_rules.py)
+# write the fixture
+cat > t.py <<'EOF'
+killall Simulator
+EOF
+=== all=block
+echo "${HOME}"; cat > t.py <<'EOF'
+cat /x/.env.local
+EOF
+=== all=block
+cat() { bash; }
+cat > t.py <<'EOF'
+killall Simulator
+EOF
+=== all=block
+function tee { bash; }
+tee t.py <<'EOF'
+cat /tmp/AuthKey_AB.p8
+EOF
+=== all=block
+alias cat=bash
+cat > t.py <<'EOF'
+killall Simulator
+EOF
+=== all=block
+git() { bash; }
+git commit -F - <<'EOF'
+xcrun simctl erase all
+EOF
+=== all=block
+PATH=/tmp/evil:/usr/bin
+cat > t.py <<'EOF'
+killall Simulator
+EOF
+=== all=block
+hash -p /bin/bash cat
+cat > t.py <<'EOF'
+cat /x/.env.local
+EOF
+=== all=block
+mkfifo p
+cat > p <<'EOF'
+killall Simulator
+EOF
+=== all=block
+exec 3>/tmp/x
+cat > t.py <<'EOF'
+killall Simulator
+EOF
+=== all=block
+cat > /dev/stdout <<'EOF'
+killall Simulator
+EOF
+=== all=block
+tee /proc/self/fd/1 <<'EOF'
+cat /x/.env.local
+EOF
