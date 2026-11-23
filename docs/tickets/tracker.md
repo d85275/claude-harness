@@ -32,5 +32,5 @@ States: `Planned`, `In progress`, `In review`, `Fixing`, `Owner check`, `Done`, 
 | [CH-24](CH-24.md) | Sample project and board example | standard | Done | 2788679 | Milestone C |
 | [CH-25](CH-25.md) | README rewrite with guards and configuration reference pages | standard | Done | 39f9973 | Milestone C |
 | [CH-26](CH-26.md) | GitHub Actions running the tests | standard | Done | 2085ff4 | Milestone C |
-| [CH-27](CH-27.md) | CHANGELOG, CONTRIBUTING and version 1.0.0 | high-risk | In progress | | Milestone C |
-| [CH-28](CH-28.md) | Pre-publish privacy sweep of the whole history | high-risk | Planned | | Milestone C |
+| [CH-27](CH-27.md) | CHANGELOG, CONTRIBUTING and version 1.0.0 | high-risk | Done | 031ee09 | Milestone C |
+| [CH-28](CH-28.md) | Pre-publish privacy sweep of the whole history | high-risk | In progress | | Milestone C |
