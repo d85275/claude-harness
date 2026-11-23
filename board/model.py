@@ -52,6 +52,7 @@ class Model:
     rows: list = field(default_factory=list)
     files: list = field(default_factory=list)
     problems: list = field(default_factory=list)
+    warnings: list = field(default_factory=list)   # stderr lines for --check; never change the exit code
     tickets: list = field(default_factory=list)    # merged view, see parse.merge
 
     def as_dict(self):

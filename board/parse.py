@@ -8,6 +8,27 @@ from .model import STATES, KNOWN_COLUMNS, Model, Problem, Row, TicketFile
 
 GENERIC_ID = r"[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z][A-Za-z0-9]*)*-\d+"
 LINK = re.compile(r"^\[([^\]]*)\]\(([^)]*)\)$")
+TITLE_SYNONYMS = ("Title", "Issue", "Summary", "Name", "Subject")
+_URL = r"\((?:[^()]|\([^()]*\))*\)"            # a link target with one level of parentheses
+INLINE_LINK = re.compile(r"(!?)\[([^\]]*)\]" + _URL)
+
+
+def title_column(lower, configured="", extras=()):
+    """Index of the title column in a lower-cased header. A configured name wins. Otherwise
+    `Title`, else a synonym that is not listed in `extras` (extraColumns). None when there is none."""
+    if configured and configured.strip():
+        name = configured.strip().lower()
+        return lower.index(name) if name in lower else None
+    skip = {e.strip().lower() for e in extras}
+    for name in (n.lower() for n in TITLE_SYNONYMS):
+        if name in lower and (name == "title" or name not in skip):
+            return lower.index(name)
+    return None
+
+
+def plain_title(text):
+    """A cell as plain text: Markdown links reduced to their text (an image to its alt text)."""
+    return INLINE_LINK.sub(lambda m: m.group(2), text).strip()
 
 
 def read_text(path):
@@ -52,7 +73,7 @@ def _is_separator(cells):
     return bool(cells) and all(re.fullmatch(r":?-{1,}:?", c) for c in cells)
 
 
-def parse_tracker(path, rel, archived, problems):
+def parse_tracker(path, rel, archived, problems, title_col="", extras=(), warnings=None):
     """Rows of the first table with ID and State columns. Problems go to `problems`."""
     text, err = read_text(path)
     if err:
@@ -65,14 +86,21 @@ def parse_tracker(path, rel, archived, problems):
         header = split_row(line)
         lower = [h.lower() for h in header]
         if "id" in lower and "state" in lower:
-            return _parse_table(lines, i, header, rel, archived, problems)
+            return _parse_table(lines, i, header, rel, archived, problems, title_col, extras, warnings)
         # skip the rest of a table that is not the tracker
     problems.append(Problem("tracker-malformed", "", f"{rel}: no table with ID and State columns"))
     return []
 
 
-def _parse_table(lines, start, header, rel, archived, problems):
+def _parse_table(lines, start, header, rel, archived, problems, title_col="", extras=(), warnings=None):
     lower = [h.lower() for h in header]
+    ti = title_column(lower, title_col, extras)
+    if title_col.strip() and warnings is not None:
+        if ti is None:
+            warnings.append(f"warning: tickets.titleColumn {title_col!r} is not a column of {rel}; cards show no tracker title")
+        elif lower[ti] in [c.lower() for c in KNOWN_COLUMNS if c != "Title"]:
+            warnings.append(f"warning: tickets.titleColumn {title_col!r} names the {header[ti]} column of {rel}, "
+                            "which holds something else; cards show it as the title")
     if start + 1 >= len(lines) or not _is_separator(split_row(lines[start + 1])):
         problems.append(Problem("tracker-malformed", "", f"{rel}:{start + 1}: table header has no separator row"))
         return []
@@ -100,8 +128,9 @@ def _parse_table(lines, start, header, rel, archived, problems):
         def col(name):
             return next((v for h, v in by.items() if h.lower() == name), "")
 
-        extra = {h: v for h, v in by.items() if h.lower() not in [c.lower() for c in KNOWN_COLUMNS]}
-        rows.append(Row(id=raw_id.upper(), link=link, title=col("title"), review=col("review"),
+        extra = {h: v for h, v in by.items() if h.lower() not in [c.lower() for c in KNOWN_COLUMNS]
+                 and h != (header[ti] if ti is not None else None)}
+        rows.append(Row(id=raw_id.upper(), link=link, title=plain_title(cells[ti]) if ti is not None else "", review=col("review"),
                         state=col("state"), commit=col("commit"), note=col("note"),
                         extra=extra, archived=archived, source=rel))
     return rows
@@ -212,17 +241,18 @@ def build(root, tickets_cfg):
     t = tickets_cfg
     prefixes = t["idPrefixes"]
     pattern = id_pattern(prefixes)
+    tcol = t.get("titleColumn", "")
     tracker = os.path.join(root, t["trackerPath"])
     if not os.path.exists(tracker):
         model.problems.append(Problem("tracker-missing", "", f"{t['trackerPath']}: tracker not found"))
     else:
-        model.rows.extend(parse_tracker(tracker, t["trackerPath"], False, model.problems))
+        model.rows.extend(parse_tracker(tracker, t["trackerPath"], False, model.problems, tcol, t["extraColumns"], model.warnings))
     if t["archive"] and t["archiveTracker"]:
         path = os.path.join(root, t["archiveTracker"])
         if not os.path.exists(path):
             model.problems.append(Problem("tracker-missing", "", f"{t['archiveTracker']}: archive tracker not found"))
         else:
-            model.rows.extend(parse_tracker(path, t["archiveTracker"], True, model.problems))
+            model.rows.extend(parse_tracker(path, t["archiveTracker"], True, model.problems, tcol, t["extraColumns"], model.warnings))
     # Rows are read first so a file named after a row ID is a ticket even when the ID has no hyphen.
     known = frozenset(r.id for r in model.rows)
     model.files.extend(collect_files(root, t["dirs"], t["featureGlobs"], pattern, False, model.problems, known))

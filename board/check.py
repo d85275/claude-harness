@@ -24,7 +24,7 @@ def merge(model, root, cfg):
         labels = list(tf.labels) if tf else []
         out.append({
             "id": tid,
-            "title": (row.title if row and row.title else tf.title if tf else ""),
+            "title": (tf.title if tf and tf.title else row.title if row else ""),
             "platform": platform,
             "kind": kind or (labels[0] if labels else ""),
             "labels": labels,

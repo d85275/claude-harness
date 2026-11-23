@@ -158,6 +158,8 @@ def run_check(ctx):
         stale = githooks.stale_warning(ctx["root"])
         if stale:
             ctx["err"].write(stale + "\n")
+    for w in ctx["model"].warnings:
+        ctx["err"].write(w + "\n")
     board = board_path(ctx)
     for rel in render.stale_sources(ctx["root"], ctx["cfg"], ctx["model"], board):
         ctx["err"].write(f"warning: board file is older than {rel}; run dev-harness-board to rebuild\n")

@@ -40,7 +40,7 @@ class BoardProject(TempProject):
                       (7, "In review")):
             self.ticket(f"BUG-{n}", st, title="t")
         self.write("docs/tickets/BUG-2.md",
-                   "# BUG-2: Crash\n\n## Status\n\nDone\n\n## Labels\n\n- crash, `p1`\n\n## Notes\n\n"
+                   "# BUG-2: Crash on <b>start</b>\n\n## Status\n\nDone\n\n## Labels\n\n- crash, `p1`\n\n## Notes\n\n"
                    "<script>alert(1)</script> \"quoted\" [bad](javascript:alert(1)) [ok](https://example.com/a?b=1&c=2)\n\n"
                    "| a | b |\n|---|---|\n| <img src=x onerror=1> | **bold** |\n")
 
@@ -256,6 +256,87 @@ class FeatureTests(BoardProject):
     def test_deterministic(self):
         self.assertEqual(self.build(), self.build())
         self.assertNotEqual(self.build(built_at="A"), self.build(built_at="B"))
+
+
+class TitleColumnTests(TempProject):
+    def model(self, header, *rows, **cfg):
+        self.config(**cfg)
+        self.tracker(*rows, header=header)
+        from board import cli
+        c, _ = cli.load_tickets_config(self.root)
+        m = cli.build_model(self.root, c)
+        return {t["id"]: t for t in m.tickets}, c, m
+
+    def test_title_and_synonyms(self):
+        for name in ("Title", "title", "Issue", "Summary", "Name", "SUBJECT"):
+            t, _, _ = self.model(f"| ID | {name} | State |\n|---|---|---|\n", "| AB-1 | Hello | Planned |")
+            self.assertEqual(t["AB-1"]["title"], "Hello", name)
+            self.assertEqual(t["AB-1"]["extra"], {}, name)
+
+    def test_title_wins_over_synonym(self):
+        t, _, _ = self.model("| ID | Name | Title | State |\n|---|---|---|---|\n", "| AB-1 | N | T | Planned |")
+        self.assertEqual(t["AB-1"]["title"], "T")
+
+    def test_title_column_setting(self):
+        h = "| ID | Title | Heading | State |\n|---|---|---|---|\n"
+        t, _, _ = self.model(h, "| AB-1 | Old | New | Planned |", titleColumn="heading")
+        self.assertEqual(t["AB-1"]["title"], "New")
+        t, _, _ = self.model(h, "| AB-1 | Old | New | Planned |", titleColumn="Missing")
+        self.assertEqual(t["AB-1"]["title"], "")
+
+    def test_file_heading_beats_cell(self):
+        self.ticket("AB-1", "Planned", title="From file")
+        self.config()
+        self.tracker("| AB-1 | From cell | Planned |", "| AB-2 | Only cell | Planned |",
+                     header="| ID | Issue | State |\n|---|---|---|\n")
+        from board import cli
+        c, _ = cli.load_tickets_config(self.root)
+        t = {x["id"]: x for x in cli.build_model(self.root, c).tickets}
+        self.assertEqual(t["AB-1"]["title"], "From file")
+        self.assertEqual(t["AB-2"]["title"], "Only cell")
+
+    def test_link_and_hostile_text(self):
+        t, c, m = self.model("| ID | Summary | State |\n|---|---|---|\n",
+                             "| AB-1 | [Fix <b>it</b>](x.md) now <script>alert(1)</script> | Planned |")
+        self.assertEqual(t["AB-1"]["title"], "Fix <b>it</b> now <script>alert(1)</script>")
+        page = render.build_html(m, self.root, c, "T0", "abc1234")
+        self.assertNotIn("<script>alert(1)", page)
+        self.assertIn("Fix &lt;b&gt;it&lt;/b&gt; now &lt;script&gt;", page)
+
+    def test_synonym_listed_in_extra_columns_stays_an_extra(self):
+        t, _, _ = self.model("| ID | Name | State | Note |\n|---|---|---|---|\n", "| AB-1 | Sam | Planned | n |",
+                             extraColumns=["Name"])
+        self.assertEqual(t["AB-1"]["title"], "")
+        self.assertEqual(t["AB-1"]["extra"], {"Name": "Sam"})
+        t, _, _ = self.model("| ID | Name | Title | State |\n|---|---|---|---|\n", "| AB-1 | Sam | T | Planned |",
+                             extraColumns=["Name"])
+        self.assertEqual(t["AB-1"]["title"], "T")
+        t, _, _ = self.model("| ID | Name | State |\n|---|---|---|\n", "| AB-1 | Sam | Planned |",
+                             extraColumns=["Name"], titleColumn="Name")
+        self.assertEqual(t["AB-1"]["title"], "Sam")
+
+    def test_nested_parentheses_and_image_alt(self):
+        t, _, _ = self.model("| ID | Title | State |\n|---|---|---|\n",
+                             "| AB-1 | [a](http://x/(y)) z | Planned |", "| AB-2 | ![logo](i.png) mark | Planned |")
+        self.assertEqual(t["AB-1"]["title"], "a z")
+        self.assertEqual(t["AB-2"]["title"], "logo mark")
+
+    def test_check_warns_on_bad_title_column(self):
+        self.ticket("AB-1", "Planned")
+        for setting, text in (("Missing", "not a column"), ("State", "names the State column")):
+            self.config(titleColumn=setting)
+            self.tracker("| AB-1 | x | Planned |")
+            code, out, err = self.check()
+            self.assertEqual((code, out), (0, ""), setting)
+            self.assertIn("warning: tickets.titleColumn", err)
+            self.assertIn(text, err)
+        self.config(titleColumn="Title")
+        self.assertEqual(self.check()[1:], ("", ""))
+
+    def test_check_unchanged_and_exit_0(self):
+        self.tracker("| AB-1 | x | Planned |", header="| ID | Issue | State |\n|---|---|---|\n")
+        self.ticket("AB-1", "Planned")
+        self.assertEqual(self.check()[0], 0)
 
 
 class CliTests(BoardProject):

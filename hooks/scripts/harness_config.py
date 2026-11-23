@@ -55,6 +55,7 @@ DEFAULTS = {
         "archiveTracker": "",
         "archiveDirs": [],
         "extraColumns": [],
+        "titleColumn": "",
     },
 }
 
@@ -219,6 +220,7 @@ _TICKETS = {
     "archiveTracker": (lambda v: isinstance(v, str), "a string"),
     "archiveDirs": (_is_str_list, "a list of strings"),
     "extraColumns": (_is_str_list, "a list of strings"),
+    "titleColumn": (lambda v: isinstance(v, str), "a string"),
 }
 
 

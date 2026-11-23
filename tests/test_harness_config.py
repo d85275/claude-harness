@@ -62,7 +62,7 @@ class DefaultTests(LoaderTestCase):
                 "twinPlatforms": None, "archive": False,
                 "trackerPath": "docs/tickets/tracker.md", "integrationBranch": "main",
                 "boardPath": "docs/tickets/board.html", "stateAliases": {},
-                "archiveTracker": "", "archiveDirs": [], "extraColumns": []}})
+                "archiveTracker": "", "archiveDirs": [], "extraColumns": [], "titleColumn": ""}})
 
     def test_defaults_are_not_shared_between_loads(self):
         cfg, _ = harness_config.load_config(self.cwd)
@@ -81,8 +81,9 @@ class DefaultTests(LoaderTestCase):
     def test_new_ticket_keys_are_accepted(self):
         cfg, errors = self.load(tickets={
             "stateAliases": {"Waiting": "blocked"}, "archiveTracker": "a/t.md",
-            "archiveDirs": ["a"], "extraColumns": ["Owner"]})
+            "archiveDirs": ["a"], "extraColumns": ["Owner"], "titleColumn": "Heading"})
         self.assertEqual(errors, [])
+        self.assertEqual(cfg["tickets"]["titleColumn"], "Heading")
         self.assertEqual(cfg["tickets"]["stateAliases"], {"Waiting": "blocked"})
         self.assertEqual(cfg["tickets"]["archiveDirs"], ["a"])
         self.assertEqual(cfg["tickets"]["extraColumns"], ["Owner"])
@@ -92,7 +93,8 @@ class DefaultTests(LoaderTestCase):
         for key, bad in (("stateAliases", {"x": "Nope"}), ("stateAliases", ["Done"]),
                          ("stateAliases", {"x": 3}), ("archiveTracker", 5),
                          ("archiveDirs", "docs"), ("archiveDirs", [1]),
-                         ("extraColumns", "Owner"), ("extraColumns", [None])):
+                         ("extraColumns", "Owner"), ("extraColumns", [None]),
+                         ("titleColumn", 5), ("titleColumn", ["Name"])):
             cfg, errors = self.load(tickets={key: bad})
             self.assertEqual(len(errors), 1, (key, bad))
             self.assertIn(f"tickets.{key}", errors[0])
