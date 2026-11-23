@@ -27,3 +27,4 @@ States: `Planned`, `In progress`, `In review`, `Fixing`, `Owner check`, `Done`, 
 | [CH-19](CH-19.md) | `/ticket-init` adopts existing trackers, with a dry-run migration report | standard + SF | Planned | | Milestone B; never rewrites old tickets |
 | [CH-20](CH-20.md) | Start, review and close keep ticket state; release check in `/sync` | standard | Planned | | Milestone B |
 | [CH-21](CH-21.md) | Check against real projects (read-only) and dogfood acceptance | standard | Planned | | Milestone B |
+| [CH-22](CH-22.md) | Guard asks before installing or removing the board's git hooks | standard | Planned | | Owner request 2026-11-23 after the CH-17 review |
