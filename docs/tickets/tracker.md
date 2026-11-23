@@ -21,8 +21,8 @@ States: `Planned`, `In progress`, `In review`, `Fixing`, `Owner check`, `Done`, 
 | [CH-13](CH-13.md) | Stash and `core.hooksPath` checks fail closed; load-tolerant timing tests | standard | Done | 9283d96 | 2 review rounds; fixed a nested-text bypass inherited from CH-12 |
 | [CH-14](CH-14.md) | Ticket parser and `dev-harness-board --check` | standard | Done | c81dfa2 | Milestone B; 1 review round |
 | [CH-15](CH-15.md) | Board HTML | standard | Done | ff13924 | Milestone B |
-| [CH-16](CH-16.md) | Board reads live worktrees | standard | In progress | | Milestone B; owner requirement 2026-11-23 |
-| [CH-17](CH-17.md) | Git hooks that rebuild the board | high-risk | Planned | | Milestone B; chains existing hooks (LFS) |
+| [CH-16](CH-16.md) | Board reads live worktrees | standard | Done | 62712f1 | Milestone B; owner requirement 2026-11-23 |
+| [CH-17](CH-17.md) | Git hooks that rebuild the board | high-risk | In progress | | Milestone B; chains existing hooks (LFS) |
 | [CH-18](CH-18.md) | `/ticket-init` for a new project | standard | Planned | | Milestone B |
 | [CH-19](CH-19.md) | `/ticket-init` adopts existing trackers, with a dry-run migration report | standard + SF | Planned | | Milestone B; never rewrites old tickets |
 | [CH-20](CH-20.md) | Start, review and close keep ticket state; release check in `/sync` | standard | Planned | | Milestone B |
