@@ -181,9 +181,12 @@ class ModuleTests(unittest.TestCase):
         self.assertLessEqual(imported, allowed_imports)
         calls = {node.func.id for node in ast.walk(tree)
                  if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)}
-        self.assertFalse(calls & {"open", "print", "exit", "input", "exec", "eval"})
+        self.assertFalse(calls & {"open", "print", "exit", "input", "exec", "eval", "__import__"})
+        self.assertNotIn("__import__", {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)})
         attributes = {f"{node.value.id}.{node.attr}" for node in ast.walk(tree)
                       if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name)}
+        os_used = {a for a in attributes if a.startswith("os.")}
+        self.assertLessEqual(os_used, {"os.path", "os.getcwd", "os.sep"})  # nothing else from os
         self.assertFalse(attributes & {"sys.exit", "sys.stdout", "sys.stderr", "sys.stdin",
                                        "os.system", "os.popen", "os.remove", "os._exit"})
 

@@ -21,6 +21,7 @@ if _HERE not in sys.path:  # python3 -I omits it
 import harness_config  # noqa: E402
 from shell_check import (DEFAULT_PROTECTED_CONFIGS, GIT_OPTIONS_WITH_VALUE, _OPTS,  # noqa: E402, F401
                          ShellCheck)
+import shell_scan  # noqa: E402
 from shell_scan import CheckTooLarge  # noqa: E402
 
 DEFAULT_PROTECTED_PATHS = [
@@ -59,6 +60,7 @@ PRESET_MARKERS = {
     "android-emulators": ((), ("gradlew",)),
 }
 SKIP_DIRS = ("node_modules",)  # plus every dot folder: never listed one level down
+CREDENTIAL_SECONDS = 4  # time for the credential pass; the hook timeout (10 s) would allow
 NOTICES = []  # warnings from the last check(); guard.py shows them as systemMessage
 
 
@@ -130,13 +132,16 @@ def preset_active(name, cfg, roots, cwd=None):
 
 
 def other_build_running(pattern="xcodebuild"):
+    """True or False; None when pgrep is missing, times out or fails (cannot tell)."""
     # Idle Gradle daemons live for hours, so only active builds/tests count.
     try:
-        out = subprocess.run(["pgrep", "-f", pattern],
-                             capture_output=True, text=True, timeout=5).stdout
+        done = subprocess.run(["pgrep", "-f", pattern],
+                              capture_output=True, text=True, timeout=5)
     except Exception:
-        return False
-    return bool(out.strip())
+        return None
+    if done.returncode not in (0, 1):  # 1 = no match; anything else is an error
+        return None
+    return bool(done.stdout.strip())
 
 
 def check(cmd, cfg, cwd, roots):
@@ -149,25 +154,47 @@ def check(cmd, cfg, cwd, roots):
     for preset, (patterns, busy) in MACHINE_WIDE_RESETS.items():
         if not any(re.search(p, cmd) for p in patterns):
             continue
-        if preset_active(preset, cfg, roots, cwd) and other_build_running(busy):
+        if not preset_active(preset, cfg, roots, cwd):
+            continue
+        running = other_build_running(busy)
+        if running is None:
+            return ("ask", "Machine-wide simulator/emulator reset: could not tell whether another "
+                    "build or test is running (pgrep is missing, timed out or failed); approve "
+                    f"manually. (Rule: preset {preset}.) Command: {cmd[:200]}"
+                    + "".join(" " + n for n in NOTICES))
+        if running:
             return ("block", "Machine-wide simulator/emulator reset blocked while another build or "
                     "test is running (it would kill another agent's devices). Shut down or delete "
                     "only the devices you created, by UDID/name. "
                     f"(Rule: preset {preset}; switch it off with disabledPresets in harness.json.)"
                     + "".join(" " + n for n in NOTICES))
+    # The credential pass. Under the size cap it reads shell words (shlex); past it, plain whitespace
+    # words (shlex is quadratic in one long word). Either way a hit blocks as always, and a
+    # deadline (well under the 10 s hook timeout, which would allow) turns "ran out of time" into ask.
+    deadline = time.monotonic() + CREDENTIAL_SECONDS
+    too_large = len(cmd) > shell_scan.LONGEST_COMMAND
     try:
-        tokens = shlex.split(cmd, posix=True)
+        tokens = cmd.split() if too_large else shlex.split(cmd, posix=True)
     except ValueError:
         tokens = cmd.split()
+    tokens = list(dict.fromkeys(tokens))
     words = {os.path.basename(t) for t in tokens}
     protected = DEFAULT_PROTECTED_PATHS + cfg.get("protectedPaths", [])
     if words & READ_VERBS:
         for t in tokens:
             if t.startswith("-"):
                 continue
+            if time.monotonic() > deadline:
+                too_large = True
+                break
             if matches(t, protected, cwd, roots):
                 return ("block", f"Command would read or copy a protected credential path ({t}). "
                         "Report paths only; never print or copy credential contents.")
+    if too_large:
+        return ("ask", f"Command too large to check ({len(cmd)} characters); approve manually. The "
+                "credential, push policy and protected-config checks did not finish within their "
+                f"limits (size {shell_scan.LONGEST_COMMAND} characters, {CREDENTIAL_SECONDS} s). "
+                f"Command: {cmd[:200]}")
     try:
         shell = ShellCheck(cfg, cwd, roots)
         shell.run(cmd)

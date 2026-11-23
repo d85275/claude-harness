@@ -232,12 +232,53 @@ def _apply(raw, rules, given, prefix, errors):
             errors.append(f"unknown key {name!r}")
 
 
+def _duplicate_messages(raw, dups):
+    """One message per repeated key, with its path (`tickets.archive`). A later list that does not
+    hold the earlier entries of a protection list drops them, and says so."""
+    if not dups:
+        return []
+    paths, stack = {}, [(raw, "")]
+    while stack:  # where each parsed object sits in the file
+        node, prefix = stack.pop()
+        if isinstance(node, dict):
+            paths[id(node)] = prefix
+            stack.extend((v, f"{prefix}{k}." if isinstance(v, dict) else f"{prefix}{k}[].")
+                         for k, v in node.items() if isinstance(v, (dict, list)))
+        else:
+            stack.extend((v, prefix) for v in node if isinstance(v, (dict, list)))
+    out = []
+    for obj, key, earlier, last in dups:
+        where = paths.get(id(obj))
+        name = key if where is None else where + key
+        msg = f"duplicate key {name!r} (only the last value is used)"
+        if where == "" and key in _SALVAGED:
+            lost = [e for v in earlier if isinstance(v, list) for e in v
+                    if not (isinstance(last, list) and e in last)]
+            if lost:
+                msg += f"; the earlier entries {lost!r} are dropped, so {_SALVAGED[key]}"
+        if msg not in out:
+            out.append(msg)
+    return out
+
+
 def _load_file(path):
     """(given, raw, errors): only the keys of this file that are present and valid."""
     errors, given = [], {}
+
+    dups = []  # (parsed object, key, earlier values, last value)
+
+    def pairs(items):  # json keeps the last of a repeated key silently; say so
+        parsed = dict(items)
+        if len(parsed) != len(items):  # only then is a key repeated
+            groups = {}
+            for k, v in items:
+                groups.setdefault(k, []).append(v)
+            dups.extend((parsed, k, vs[:-1], vs[-1]) for k, vs in groups.items() if len(vs) > 1)
+        return parsed
+
     try:
         with open(path, encoding="utf-8") as f:
-            raw = json.load(f)
+            raw = json.load(f, object_pairs_hook=pairs)
     except (OSError, ValueError, RecursionError) as e:  # ValueError: bad JSON or UTF-8
         return {}, None, [f"{path}: cannot read: {type(e).__name__}: {e}; this file's "
                           "protections (protectedPaths, protectedConfigs, askCommands) "
@@ -245,6 +286,7 @@ def _load_file(path):
     if not isinstance(raw, dict):
         return {}, None, [f"{path}: must hold a JSON object; this file's protections "
                           "are NOT active"]
+    errors.extend(_duplicate_messages(raw, dups))
     _apply(raw, _TOP, given, "", errors)
     if "tickets" in raw:
         if isinstance(raw["tickets"], dict):

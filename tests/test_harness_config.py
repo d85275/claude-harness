@@ -1,6 +1,7 @@
 """Tests for hooks/scripts/harness_config.py and its use by guard.py."""
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -462,7 +463,10 @@ class GuardIntegrationTests(LoaderTestCase):
         proc = self.guard("bash", {"command": "cat pkgsecret/x"}, cwd=pkg, env=env)
         self.assertEqual(proc.returncode, 2)
         self.assertIn("NOT active", proc.stderr)
-        proc = self.guard("bash", {"command": "ls"}, cwd=pkg, env=env)
+        # CH-07: the warning shows once per config state, so use a fresh marker folder here
+        fresh = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, fresh, True)
+        proc = self.guard("bash", {"command": "ls"}, cwd=pkg, env={**env, "TMPDIR": fresh})
         self.assertIn("NOT active", self.stdout_json(proc)["systemMessage"])
 
     def test_identical_copies_are_silent(self):
