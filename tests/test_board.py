@@ -81,8 +81,8 @@ class FixtureTests(unittest.TestCase):
 
 
 class UsageTests(TempProject):
-    def test_no_mode_is_usage_error(self):
-        self.assertEqual(run("--root", self.root)[0], 2)
+    def test_out_with_check_is_usage_error(self):
+        self.assertEqual(run("--check", "--out", "x.html", "--root", self.root)[0], 2)
 
     def test_unknown_flag(self):
         self.assertEqual(run("--bogus")[0], 2)

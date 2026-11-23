@@ -44,6 +44,7 @@ class TicketFile:
     title: str = ""
     status: str = ""                # the Status line as written
     archived: bool = False
+    labels: list = field(default_factory=list)   # from an optional '## Labels' section
 
 
 @dataclass

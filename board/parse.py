@@ -133,11 +133,28 @@ def parse_ticket(path, rel, ticket_id, archived, problems):
                     status = nxt.strip()
                     break
             break
+    tf.labels = _labels(lines)
     if status is None:
         problems.append(Problem("file-malformed", ticket_id, f"{rel}: no '## Status' section with a status line"))
     else:
         tf.status = status
     return tf
+
+
+def _labels(lines):
+    """Labels from an optional '## Labels' section: comma separated and/or one per bullet."""
+    for i, l in enumerate(lines):
+        if re.match(r"##\s+Labels\s*$", l.strip(), re.I):
+            found = []
+            for nxt in lines[i + 1:]:
+                if nxt.startswith("#"):
+                    break
+                for part in re.sub(r"^\s*[-*+]\s+", "", nxt).split(","):
+                    part = part.strip().strip("`*_ ")
+                    if part and part not in found:
+                        found.append(part)
+            return found
+    return []
 
 
 def id_pattern(prefixes):

@@ -1,12 +1,16 @@
 """Command line for dev-harness-board.
 
+    dev-harness-board [--root DIR] [--out PATH]    write the board HTML (default mode)
     dev-harness-board [--root DIR] --check | --json
 
---check   print one line per problem; exit 1 if any, else 0
+(no flag) write tickets.boardPath (or --out) atomically; print the path written
+--check   print one line per problem; exit 1 if any, else 0. A board file older than the tracker
+          or a ticket file adds a "warning: ..." line on stderr (no effect on the exit code)
 --json    print the parsed model as JSON
 
-Exit 2: bad usage or unreadable config. The command never writes a file and never runs git.
-Add new modes (render, init, install-hooks) in MODES and in `parse_args`.
+Exit 2: bad usage or unreadable config. Only the render mode writes a file; nothing runs git.
+Add new modes (init, install-hooks) as a function `run_<mode>(ctx)` registered in MODES, and
+select it in `pick_mode`. `ctx` carries root, tickets config, model, args and the streams.
 """
 import argparse
 import json
@@ -18,6 +22,7 @@ import harness_config  # noqa: E402
 
 from . import check as checks  # noqa: E402
 from . import parse  # noqa: E402
+from . import render  # noqa: E402
 
 FATAL_CONFIG = ("cannot read", "must hold a JSON object")
 
@@ -54,16 +59,47 @@ def build_model(root, tickets_cfg):
     return model
 
 
-def run_check(model, out):
-    for p in model.problems:
-        out.write(p.line() + "\n")
-    return 1 if model.problems else 0
+def run_check(ctx):
+    for p in ctx["model"].problems:
+        ctx["out"].write(p.line() + "\n")
+    board = board_path(ctx)
+    for rel in render.stale_sources(ctx["root"], ctx["cfg"], ctx["model"], board):
+        ctx["err"].write(f"warning: board file is older than {rel}; run dev-harness-board to rebuild\n")
+    return 1 if ctx["model"].problems else 0
 
 
-def run_json(model, out):
-    json.dump(model.as_dict(), out, indent=2)
-    out.write("\n")
+def run_json(ctx):
+    json.dump(ctx["model"].as_dict(), ctx["out"], indent=2)
+    ctx["out"].write("\n")
+    return 1 if ctx["args"].check and ctx["model"].problems else 0
+
+
+def board_path(ctx):
+    target = ctx["args"].out or ctx["cfg"]["boardPath"]
+    return os.path.abspath(os.path.join(ctx["root"], target))
+
+
+def run_render(ctx):
+    path = board_path(ctx)
+    html = render.build_html(ctx["model"], ctx["root"], ctx["cfg"], render.now_utc(), render.read_commit(ctx["root"]))
+    try:
+        render.write_atomic(path, html)
+    except OSError as e:
+        ctx["err"].write(f"dev-harness-board: cannot write {path}: {e}\n")
+        return 2
+    ctx["out"].write(f"wrote {path}\n")
     return 0
+
+
+MODES = {"check": run_check, "json": run_json, "render": run_render}
+
+
+def pick_mode(args):
+    if args.json:
+        return "json"
+    if args.check:
+        return "check"
+    return "render"
 
 
 class _Parser(argparse.ArgumentParser):
@@ -74,13 +110,14 @@ class _Parser(argparse.ArgumentParser):
 def parse_args(argv):
     ap = _Parser(prog="dev-harness-board", add_help=False)
     ap.add_argument("--root")
+    ap.add_argument("--out")
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--json", action="store_true")
     ap.add_argument("-h", "--help", action="store_true")
     return ap.parse_args(argv)
 
 
-USAGE = "usage: dev-harness-board [--root DIR] (--check | --json)\n"
+USAGE = "usage: dev-harness-board [--root DIR] [--out PATH | --check | --json]\n"
 
 
 def main(argv, out=None, err=None):
@@ -93,8 +130,12 @@ def main(argv, out=None, err=None):
     if args.help:
         out.write(USAGE)
         return 0
-    if not (args.check or args.json):
-        err.write(USAGE)
+    mode = pick_mode(args)
+    if args.out is not None and mode != "render":
+        err.write(f"dev-harness-board: --out only applies when writing the board\n{USAGE}")
+        return 2
+    if args.out == "":
+        err.write(f"dev-harness-board: --out needs a path\n{USAGE}")
         return 2
     root = os.path.abspath(args.root) if args.root else find_root(os.getcwd())
     if not os.path.isdir(root):
@@ -104,9 +145,5 @@ def main(argv, out=None, err=None):
     err.write(harness_config.format_errors(errors))
     if any(f in e for e in errors for f in FATAL_CONFIG):
         return 2
-    model = build_model(root, cfg)
-    if args.json:
-        run_json(model, out)
-        return 1 if args.check and model.problems else 0
-    return run_check(model, out)
-
+    ctx = {"root": root, "cfg": cfg, "model": build_model(root, cfg), "args": args, "out": out, "err": err}
+    return MODES[mode](ctx)

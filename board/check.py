@@ -20,11 +20,13 @@ def merge(model, root, cfg):
         row = rows[tid][0] if rows[tid] else None
         tf = files[tid][0] if files[tid] else None
         platform, kind = prefix_info(tid, cfg["idPrefixes"])
+        labels = list(tf.labels) if tf else []
         out.append({
             "id": tid,
             "title": (row.title if row and row.title else tf.title if tf else ""),
             "platform": platform,
-            "kind": kind,
+            "kind": kind or (labels[0] if labels else ""),
+            "labels": labels,
             "state": resolve_state(row.state, names) if row else None,
             "rowState": row.state if row else None,
             "fileState": resolve_state(tf.status, names) if tf else None,
