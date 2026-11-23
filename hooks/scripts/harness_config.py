@@ -19,8 +19,10 @@ used. A file above the repo root is never loaded, only noticed. Each file is loa
 own; a broken or unreadable one is reported (an entry that exists but cannot be read counts
 as present) and the others still apply. Sources merge so the result is never weaker than
 any one of them: union (deduplicated) of protectedPaths, protectedConfigs, askCommands,
-weakeningMarkers and presets; strictest pushPolicy (deny > ask > allow); checkWeakening
-true if any source says true; for the rest the root wins, falling back to nested files.
+weakeningMarkers; strictest pushPolicy (deny > ask > allow); checkWeakening
+true if any source says true; presets (explicit on) and disabledPresets (explicit off)
+are each unioned, but a name in both is on unless the same file lists it in both (then off);
+unknown preset names are reported and dropped; for the rest the root wins, falling back to nested files.
 `project_roots(cwd)` gives each loaded file's project folder, for matching relative globs.
 """
 import copy
@@ -38,6 +40,7 @@ DEFAULTS = {
     "notify": True,
     "pushPolicy": "ask",
     "presets": [],
+    "disabledPresets": [],
     "highRiskReviewerModel": "opus",
     "tickets": {
         "dirs": ["docs/tickets"],
@@ -52,6 +55,7 @@ DEFAULTS = {
 }
 
 PUSH_POLICIES = ("ask", "deny", "allow")
+PRESET_NAMES = ("apple-simulators", "android-emulators")
 REVIEWER_MODELS = ("opus", "fable")
 
 
@@ -187,6 +191,7 @@ _TOP = {
     "notify": (lambda v: isinstance(v, bool), "true or false"),
     "pushPolicy": (lambda v: v in PUSH_POLICIES, 'one of "ask", "deny", "allow"'),
     "presets": (_is_str_list, "a list of preset names"),
+    "disabledPresets": (_is_str_list, "a list of preset names"),
     "highRiskReviewerModel": (lambda v: v in REVIEWER_MODELS, 'one of "opus", "fable"'),
 }
 _TICKETS = {
@@ -201,6 +206,15 @@ _TICKETS = {
 }
 
 
+def _known_presets(name, names, errors):
+    """Keep the known preset names; report each unknown one (it does nothing)."""
+    for n in names:
+        if n not in PRESET_NAMES:
+            errors.append(f"{name!r} entry {n!r} is not a known preset ({', '.join(PRESET_NAMES)}) "
+                          "and is ignored")
+    return [n for n in names if n in PRESET_NAMES]
+
+
 def _apply(raw, rules, given, prefix, errors):
     for key, value in raw.items():
         name = prefix + key
@@ -210,6 +224,8 @@ def _apply(raw, rules, given, prefix, errors):
             ok, expected = rules[key]
             if ok(value):
                 given[key] = copy.deepcopy(value)
+                if prefix == "" and key in ("presets", "disabledPresets"):
+                    given[key] = _known_presets(name, given[key], errors)
             else:
                 errors.append(f"{name!r} must be {expected}; using the default")
         elif not (prefix == "" and key == "tickets"):
@@ -239,7 +255,7 @@ def _load_file(path):
     return given, raw, [f"{path}: {e}" if not e.startswith(path) else e for e in errors]
 
 
-_UNION = ("protectedPaths", "protectedConfigs", "askCommands", "weakeningMarkers", "presets")
+_UNION = ("protectedPaths", "protectedConfigs", "askCommands", "weakeningMarkers")
 _STRICTNESS = {"allow": 0, "ask": 1, "deny": 2}
 
 
@@ -248,6 +264,11 @@ def _merge(sources):
     cfg = copy.deepcopy(DEFAULTS)
     for key in _UNION:
         cfg[key] = list(dict.fromkeys(v for g in sources for v in g.get(key, [])))
+    # Presets: within one file "off" wins; across files an explicit "on" beats an "off".
+    on = [v for g in sources for v in g.get("presets", []) if v not in g.get("disabledPresets", [])]
+    cfg["presets"] = list(dict.fromkeys(on))
+    cfg["disabledPresets"] = list(dict.fromkeys(
+        v for g in sources for v in g.get("disabledPresets", []) if v not in cfg["presets"]))
     policies = [g["pushPolicy"] for g in sources if "pushPolicy" in g]
     if policies:
         cfg["pushPolicy"] = max(policies, key=_STRICTNESS.get)
@@ -289,6 +310,23 @@ def load_all(cwd):
         errors.append(f"unexpected {type(e).__name__} while loading harness.json: {e}; using "
                       "defaults, so ALL project protections are NOT active")
         return copy.deepcopy(DEFAULTS), errors, []
+
+
+def detection_roots(cwd):
+    """Folders to look in for project files (Xcode project, gradlew): `CLAUDE_PROJECT_DIR`, the
+    repo root found from cwd (a worktree's own root), and the folders of the loaded configs.
+    Unlike the config roots, these exist without any harness.json. Never raises."""
+    roots = []
+    try:
+        start = os.path.abspath(cwd or os.getcwd())
+        project = os.environ.get("CLAUDE_PROJECT_DIR")
+        project = os.path.abspath(project) if project else None
+        roots = [_search_boundary(start, project)]
+        if project:
+            roots.append(project)
+    except Exception:
+        pass
+    return roots
 
 
 def load_config(cwd):

@@ -105,7 +105,10 @@ def ask(reason):
 def guard_bash(data, cfg):
     """The first Bash rule the command hits (bash_rules.check) becomes a block or an ask."""
     cmd = (data.get("tool_input") or {}).get("command", "")
+    global CONFIG_WARNING
     result = bash_rules.check(cmd, cfg, data.get("cwd"), PROJECT_ROOTS)
+    if bash_rules.NOTICES:  # e.g. a preset switched on because a folder could not be listed
+        CONFIG_WARNING = " ".join(filter(None, [CONFIG_WARNING] + bash_rules.NOTICES))
     if result:
         decision, message = result
         if decision == "block":

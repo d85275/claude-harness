@@ -54,7 +54,8 @@ class DefaultTests(LoaderTestCase):
         self.assertEqual(cfg, {
             "version": 1, "protectedPaths": [], "protectedConfigs": [], "askCommands": [],
             "checkWeakening": True, "weakeningMarkers": [], "notify": True,
-            "pushPolicy": "ask", "presets": [], "highRiskReviewerModel": "opus",
+            "pushPolicy": "ask", "presets": [], "disabledPresets": [],
+            "highRiskReviewerModel": "opus",
             "tickets": {
                 "dirs": ["docs/tickets"], "featureGlobs": [], "idPrefixes": {},
                 "twinPlatforms": None, "archive": False,
@@ -108,7 +109,7 @@ class ValidationTests(LoaderTestCase):
 
     def test_bad_values_are_reported_and_default_used(self):
         bad = [("version", 2), ("pushPolicy", "never"), ("highRiskReviewerModel", "gpt"),
-               ("notify", "yes"), ("presets", [1]),
+               ("notify", "yes"), ("presets", [1]), ("disabledPresets", "x"),
                ("checkWeakening", 0), ("tickets", [])]
         for key, value in bad:
             with self.subTest(key=key):
@@ -128,7 +129,7 @@ class ValidationTests(LoaderTestCase):
 
     def test_valid_values_are_accepted(self):
         cfg, errors = self.load(
-            pushPolicy="deny", highRiskReviewerModel="fable", presets=["a"],
+            pushPolicy="deny", highRiskReviewerModel="fable", presets=["apple-simulators"],
             tickets={"idPrefixes": {"IOS": {"platform": "ios", "kind": "port"}},
                      "twinPlatforms": ["ios", "android"]})
         self.assertEqual(errors, [])
@@ -290,16 +291,16 @@ class LocationTests(LoaderTestCase):
                 self.assertEqual(cfg["pushPolicy"], expected)
 
     def test_other_merge_rules(self):
-        self.write(json.dumps({"checkWeakening": False, "notify": False, "presets": ["a"],
+        self.write(json.dumps({"checkWeakening": False, "notify": False, "presets": ["apple-simulators"],
                                "weakeningMarkers": ["x"], "highRiskReviewerModel": 5,
                                "tickets": {"archive": True}}))
         cfg, _ = harness_config.load_config(self.nested(
-            {"checkWeakening": True, "notify": True, "presets": ["a", "b"],
+            {"checkWeakening": True, "notify": True, "presets": ["apple-simulators", "android-emulators"],
              "weakeningMarkers": ["y"], "highRiskReviewerModel": "fable",
              "tickets": {"archive": False, "boardPath": "b.html"}}))
         self.assertTrue(cfg["checkWeakening"])      # true if either is true
         self.assertFalse(cfg["notify"])             # root wins
-        self.assertEqual(cfg["presets"], ["a", "b"])
+        self.assertEqual(cfg["presets"], ["apple-simulators", "android-emulators"])
         self.assertEqual(cfg["weakeningMarkers"], ["x", "y"])
         self.assertEqual(cfg["highRiskReviewerModel"], "fable")  # root invalid -> nested
         self.assertTrue(cfg["tickets"]["archive"])  # root wins

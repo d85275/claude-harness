@@ -46,6 +46,32 @@ class GuardTestCase(unittest.TestCase):
         return run("bash", {"command": command}, self.cwd)
 
 
+class DevicePresetWiringTests(GuardTestCase):
+    @unittest.skipIf(hasattr(os, "geteuid") and os.geteuid() == 0, "root can list anything")
+    def test_listing_failure_notice_reaches_system_message(self):
+        locked = os.path.join(self.cwd, "locked")
+        os.makedirs(os.path.join(self.cwd, ".git"))
+        os.makedirs(locked)
+        stub = tempfile.mkdtemp()
+        self.addCleanup(lambda: __import__("shutil").rmtree(stub, ignore_errors=True))
+        pgrep = os.path.join(stub, "pgrep")  # no build is running
+        with open(pgrep, "w") as f:
+            f.write("#!/bin/sh\nexit 1\n")
+        os.chmod(pgrep, 0o755)
+        os.chmod(locked, 0)
+        payload = json.dumps({"tool_input": {"command": "adb emu kill"}, "cwd": self.cwd})
+        env = {k: v for k, v in os.environ.items() if k != "CLAUDE_PROJECT_DIR"}
+        env["PATH"] = stub + os.pathsep + env.get("PATH", "")
+        try:
+            proc = subprocess.run([sys.executable, "-I", GUARD, "bash"], input=payload,
+                                  capture_output=True, text=True, timeout=20, env=env)
+        finally:
+            os.chmod(locked, 0o755)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        message = json.loads(proc.stdout)["systemMessage"]
+        self.assertIn("treating the android-emulators preset as ON", message)
+
+
 class BashTests(GuardTestCase):
     def test_credential_reads_are_blocked(self):
         for cmd in ["cat keys/AuthKey_ABC.p8", "cp release.keystore /tmp/",

@@ -8,6 +8,7 @@
   "notify": true,
   "pushPolicy": "ask",
   "presets": [],
+  "disabledPresets": [],
   "highRiskReviewerModel": "opus",
   "tickets": {
     "dirs": ["docs/tickets"],

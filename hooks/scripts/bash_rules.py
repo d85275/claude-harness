@@ -40,12 +40,25 @@ READ_VERBS = {
     "xxd", "od", "hexdump", "strings", "openssl", "keytool", "jq", "sed", "awk", "grep",
     "rg", "python", "python3", "node", "ruby", "perl", "curl", "pbcopy", "tee", "zip", "tar",
 }
-MACHINE_WIDE_RESETS = [
-    r"simctl\s+shutdown\s+all\b",
-    r"simctl\s+(--set\s+\S+\s+)?(delete|erase)\s+all\b",
-    r"adb\s+emu\s+kill\b",
-    r"\bkillall\s+(Simulator|qemu-system\S*|xcodebuild)\b",
-]
+# preset -> (reset patterns, pgrep pattern of the build that makes a reset unsafe)
+MACHINE_WIDE_RESETS = {
+    "apple-simulators": ([
+        r"simctl\s+shutdown\s+all\b",
+        r"simctl\s+(--set\s+\S+\s+)?(delete|erase)\s+all\b",
+        r"\bkillall\s+(Simulator|xcodebuild)\b",
+    ], "xcodebuild"),
+    "android-emulators": ([
+        r"adb\s+emu\s+kill\b",
+        r"\bkillall\s+qemu-system\S*",
+    ], "gradlew"),
+}
+# Files that switch a preset on by themselves: (suffixes, exact names).
+PRESET_MARKERS = {
+    "apple-simulators": ((".xcodeproj", ".xcworkspace"), ()),
+    "android-emulators": ((), ("gradlew",)),
+}
+SKIP_DIRS = ("node_modules",)  # plus every dot folder: never listed one level down
+NOTICES = []  # warnings from the last check(); guard.py shows them as systemMessage
 
 
 
@@ -69,6 +82,52 @@ def matches(path, globs, cwd, roots=()):
     return False
 
 
+def preset_active(name, cfg, roots, cwd=None):
+    """Is a device preset on? Explicit "on" beats "off"; else auto-on when a root or one of its
+    direct subfolders holds the preset's marker file. A listing that fails counts as on (and adds
+    a notice). A cheap listing only: no deep walk."""
+    if name in cfg.get("presets", []):
+        return True
+    if name in cfg.get("disabledPresets", []):
+        return False
+    suffixes, names = PRESET_MARKERS[name]
+
+    def hit(entries):
+        return any(e.endswith(suffixes) if suffixes else e in names for e in entries)
+
+    def fail(path, err):
+        NOTICES.append(f"[dev-harness] could not list {path} ({type(err).__name__}) to look for "
+                       f"a mobile project; treating the {name} preset as ON")
+        return True
+
+    folders = list(dict.fromkeys(list(roots or ()) + harness_config.detection_roots(cwd)))
+    if not folders:
+        NOTICES.append("[dev-harness] could not find the project folder to look for a mobile "
+                       f"project; treating the {name} preset as ON")
+        return True
+    for root in folders:
+        try:
+            with os.scandir(root) as it:
+                entries = list(it)
+        except OSError as e:
+            return fail(root, e)
+        if hit(e.name for e in entries):
+            return True
+        for e in entries:
+            if e.name.startswith(".") or e.name in SKIP_DIRS or e.name.endswith(
+                    (".xcodeproj", ".xcworkspace")):
+                continue
+            try:
+                if not e.is_dir():
+                    continue
+                with os.scandir(e.path) as it:
+                    if hit(x.name for x in it):
+                        return True
+            except OSError as err:
+                return fail(e.path, err)
+    return False
+
+
 def other_build_running(pattern="xcodebuild"):
     # Idle Gradle daemons live for hours, so only active builds/tests count.
     try:
@@ -83,14 +142,18 @@ def check(cmd, cfg, cwd, roots):
     """("block" | "ask", message) for the first rule a Bash command hits, or None. The rules run
     in this order: device resets, credential reads, the shell check (push policy, then protected
     configs), always-ask commands. A shell check that cannot decide asks."""
+    del NOTICES[:]
     if not cmd:
         return None
-    for pattern in MACHINE_WIDE_RESETS:
-        busy = "xcodebuild" if "simctl" in pattern or "Simulator" in pattern else "xcodebuild|gradlew"
-        if re.search(pattern, cmd) and other_build_running(busy):
+    for preset, (patterns, busy) in MACHINE_WIDE_RESETS.items():
+        if not any(re.search(p, cmd) for p in patterns):
+            continue
+        if preset_active(preset, cfg, roots, cwd) and other_build_running(busy):
             return ("block", "Machine-wide simulator/emulator reset blocked while another build or "
                     "test is running (it would kill another agent's devices). Shut down or delete "
-                    "only the devices you created, by UDID/name.")
+                    "only the devices you created, by UDID/name. "
+                    f"(Rule: preset {preset}; switch it off with disabledPresets in harness.json.)"
+                    + "".join(" " + n for n in NOTICES))
     try:
         tokens = shlex.split(cmd, posix=True)
     except ValueError:
