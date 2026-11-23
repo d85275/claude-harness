@@ -47,7 +47,7 @@ Goal: release **1.0** of the `dev-harness` plugin with a ticket system and a Jir
 
 ## Next
 
-CH-01 is done (c2efe7d). CH-02 is done (ef867a1). CH-03 is done (b999c7d). CH-08 is done (99aedc3). Tickets run one at a time (owner, 2026-11-22), except that CH-06 may run alongside one other ticket (owner, 2026-11-22). CH-04 is done (19319cb). CH-06 is done (2b18eb4). CH-05 is done (a7497ff). CH-07 is done (3a6ca12). CH-10 is done (7a42cf4). CH-11 is done (000f1ee). CH-12 is done (a2f0c10). CH-13 is done (9283d96). Running: CH-09 (feature-branch pushes, high-risk), then Milestone B (owner, 2026-11-23). Every remaining ticket has an explicit catch list and at most 2 review rounds (owner, 2026-11-22).
+CH-01 is done (c2efe7d). CH-02 is done (ef867a1). CH-03 is done (b999c7d). CH-08 is done (99aedc3). Tickets run one at a time (owner, 2026-11-22), except that CH-06 may run alongside one other ticket (owner, 2026-11-22). CH-04 is done (19319cb). CH-06 is done (2b18eb4). CH-05 is done (a7497ff). CH-07 is done (3a6ca12). CH-10 is done (7a42cf4). CH-11 is done (000f1ee). CH-12 is done (a2f0c10). CH-13 is done (9283d96). CH-09 is parked (Deferred) after three high-risk rounds; its work stays on `feature/ch-09` for after 1.0. Next: Milestone B (owner, 2026-11-23). Every remaining ticket has an explicit catch list and at most 2 review rounds (owner, 2026-11-22).
 
 ## Owner decisions
 
