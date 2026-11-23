@@ -8,7 +8,10 @@
           or a ticket file adds a "warning: ..." line on stderr (no effect on the exit code)
 --json    print the parsed model as JSON
 
-Exit 2: bad usage or unreadable config. Only the render mode writes a file; nothing runs git.
+Exit 2: bad usage or unreadable config. Only the render mode writes a file.
+Run from a linked worktree, it works on the main checkout (so the board is written there). The
+render and json modes run read-only git (`rev-parse`, `worktree list`, each with a timeout) to
+show tickets being built in a worktree on feature/<id>; --check runs no git for its result.
 Add new modes (init, install-hooks) as a function `run_<mode>(ctx)` registered in MODES, and
 select it in `pick_mode`. `ctx` carries root, tickets config, model, args and the streams.
 """
@@ -23,6 +26,7 @@ import harness_config  # noqa: E402
 from . import check as checks  # noqa: E402
 from . import parse  # noqa: E402
 from . import render  # noqa: E402
+from . import worktrees  # noqa: E402
 
 FATAL_CONFIG = ("cannot read", "must hold a JSON object")
 
@@ -52,10 +56,14 @@ def load_tickets_config(root):
     return cfg["tickets"], errors
 
 
-def build_model(root, tickets_cfg):
+def build_model(root, tickets_cfg, live=False):
+    """Parse and check `root`. With `live`, tickets with a worktree on feature/<id> show the
+    state of that work (never read by the checks)."""
     model = parse.build(root, tickets_cfg)
     checks.merge(model, root, tickets_cfg)
     checks.check(model, root, tickets_cfg)
+    if live:
+        worktrees.apply(model, root, tickets_cfg)
     return model
 
 
@@ -141,9 +149,10 @@ def main(argv, out=None, err=None):
     if not os.path.isdir(root):
         err.write(f"dev-harness-board: --root {root} is not a directory\n")
         return 2
+    root = worktrees.main_checkout(root) or root     # run from a worktree: work on the main checkout
     cfg, errors = load_tickets_config(root)
     err.write(harness_config.format_errors(errors))
     if any(f in e for e in errors for f in FATAL_CONFIG):
         return 2
-    ctx = {"root": root, "cfg": cfg, "model": build_model(root, cfg), "args": args, "out": out, "err": err}
+    ctx = {"root": root, "cfg": cfg, "model": build_model(root, cfg, live=mode != "check"), "args": args, "out": out, "err": err}
     return MODES[mode](ctx)

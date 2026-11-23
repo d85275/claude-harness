@@ -113,6 +113,8 @@ def _card(t, level, mismatch, extra_cols):
     badges += [f'<span class="tag">{esc(l)}</span>' for l in t["labels"]]
     extras = "".join(f'<div class="extra">{esc(c)}: {esc(t["extra"][c])}</div>'
                      for c in extra_cols if t["extra"].get(c))
+    if t.get("liveBranch"):
+        badges.append(f'<span class="tag live">from {esc(t["liveBranch"])}</span>')
     search = esc((t["id"] + " " + t["title"]).lower())
     return (f'<button type="button" class="card" data-id="{esc(t["id"])}" data-kind="{esc(t["kind"])}" '
             f'data-platform="{esc(t["platform"])}" data-review="{esc(level)}" '
@@ -136,6 +138,8 @@ def _issue(t, root, level, problems, twins, extra_cols):
                 body = "<pre>" + esc("\n".join(lines)) + "</pre>"
     rows = [("State", t["state"] or t["fileState"] or "unknown"), ("Review", t["review"] or level or "-"),
             ("Commit", t["commit"] or "-")]
+    if t.get("liveBranch"):
+        rows.append(("Live work", "state from " + t["liveBranch"]))
     if t["note"]:
         rows.append(("Note", t["note"]))
     if t["file"]:
