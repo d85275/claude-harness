@@ -34,3 +34,4 @@ States: `Planned`, `In progress`, `In review`, `Fixing`, `Owner check`, `Done`, 
 | [CH-26](CH-26.md) | GitHub Actions running the tests | standard | Done | 2085ff4 | Milestone C |
 | [CH-27](CH-27.md) | CHANGELOG, CONTRIBUTING and version 1.0.0 | high-risk | Done | 031ee09 | Milestone C |
 | [CH-28](CH-28.md) | Pre-publish privacy sweep of the whole history | high-risk | Done | 2e69f1d | Milestone C |
+| [CH-29](CH-29.md) | Plugin ticket commands leave projects that have not switched over alone | standard | In progress | | Owner request 2026-11-23, before tagging 1.0 |
