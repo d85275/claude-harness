@@ -11,7 +11,7 @@ Claude Code plugin `dev-harness`: agents, commands and guard hooks for a plan ->
 - **Verify**:
   - focused: `python3 -m unittest tests.<module>`
   - full: `python3 -m unittest discover -s tests`
-  - static: `python3 -m py_compile hooks/scripts/*.py`
+  - static: `python3 -m py_compile hooks/scripts/*.py board/*.py`
 - **Dependencies**: Python 3 standard library only at runtime.
 - **High-risk categories** (implementer-advanced + high-risk-reviewer): changes that weaken or bypass a guard (push policy, credential reads, protected configs), anything that runs on other people's machines unasked (git hooks, `core.hooksPath`), and release/publishing.
 - **Boundaries - stop and ask the owner**: `git push`, changing repo visibility, tags, rewriting history.

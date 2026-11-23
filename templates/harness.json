@@ -18,6 +18,10 @@
     "archive": false,
     "trackerPath": "docs/tickets/tracker.md",
     "integrationBranch": "main",
-    "boardPath": "docs/tickets/board.html"
+    "boardPath": "docs/tickets/board.html",
+    "stateAliases": {},
+    "archiveTracker": "",
+    "archiveDirs": [],
+    "extraColumns": []
   }
 }

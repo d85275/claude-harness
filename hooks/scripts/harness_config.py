@@ -51,10 +51,15 @@ DEFAULTS = {
         "trackerPath": "docs/tickets/tracker.md",
         "integrationBranch": "main",
         "boardPath": "docs/tickets/board.html",
+        "stateAliases": {},
+        "archiveTracker": "",
+        "archiveDirs": [],
+        "extraColumns": [],
     },
 }
 
 PUSH_POLICIES = ("ask", "deny", "allow")
+TICKET_STATES = ("Planned", "In progress", "In review", "Fixing", "Owner check", "Done", "Blocked", "Deferred")
 PRESET_NAMES = ("apple-simulators", "android-emulators")
 REVIEWER_MODELS = ("opus", "fable")
 
@@ -146,6 +151,12 @@ def _check_prefixes(v):
         for k, e in v.items())
 
 
+def _check_aliases(v):
+    states = [s.lower() for s in TICKET_STATES]
+    return isinstance(v, dict) and all(
+        isinstance(k, str) and isinstance(e, str) and e.lower() in states for k, e in v.items())
+
+
 def _regex_problem(pattern):
     try:
         re.compile(pattern)
@@ -203,6 +214,11 @@ _TICKETS = {
     "trackerPath": (lambda v: isinstance(v, str), "a string"),
     "integrationBranch": (lambda v: isinstance(v, str), "a string"),
     "boardPath": (lambda v: isinstance(v, str), "a string"),
+    "stateAliases": (_check_aliases, "an object mapping your state names to standard states "
+                                     "(" + ", ".join(TICKET_STATES) + ")"),
+    "archiveTracker": (lambda v: isinstance(v, str), "a string"),
+    "archiveDirs": (_is_str_list, "a list of strings"),
+    "extraColumns": (_is_str_list, "a list of strings"),
 }
 
 

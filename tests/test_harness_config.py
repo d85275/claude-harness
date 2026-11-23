@@ -61,7 +61,8 @@ class DefaultTests(LoaderTestCase):
                 "dirs": ["docs/tickets"], "featureGlobs": [], "idPrefixes": {},
                 "twinPlatforms": None, "archive": False,
                 "trackerPath": "docs/tickets/tracker.md", "integrationBranch": "main",
-                "boardPath": "docs/tickets/board.html"}})
+                "boardPath": "docs/tickets/board.html", "stateAliases": {},
+                "archiveTracker": "", "archiveDirs": [], "extraColumns": []}})
 
     def test_defaults_are_not_shared_between_loads(self):
         cfg, _ = harness_config.load_config(self.cwd)
@@ -76,6 +77,26 @@ class DefaultTests(LoaderTestCase):
         self.assertEqual(errors, [])
         self.assertTrue(cfg["tickets"]["archive"])
         self.assertEqual(cfg["tickets"]["integrationBranch"], "main")
+
+    def test_new_ticket_keys_are_accepted(self):
+        cfg, errors = self.load(tickets={
+            "stateAliases": {"Waiting": "blocked"}, "archiveTracker": "a/t.md",
+            "archiveDirs": ["a"], "extraColumns": ["Owner"]})
+        self.assertEqual(errors, [])
+        self.assertEqual(cfg["tickets"]["stateAliases"], {"Waiting": "blocked"})
+        self.assertEqual(cfg["tickets"]["archiveDirs"], ["a"])
+        self.assertEqual(cfg["tickets"]["extraColumns"], ["Owner"])
+        self.assertEqual(cfg["tickets"]["archiveTracker"], "a/t.md")
+
+    def test_bad_new_ticket_keys_warn_and_default(self):
+        for key, bad in (("stateAliases", {"x": "Nope"}), ("stateAliases", ["Done"]),
+                         ("stateAliases", {"x": 3}), ("archiveTracker", 5),
+                         ("archiveDirs", "docs"), ("archiveDirs", [1]),
+                         ("extraColumns", "Owner"), ("extraColumns", [None])):
+            cfg, errors = self.load(tickets={key: bad})
+            self.assertEqual(len(errors), 1, (key, bad))
+            self.assertIn(f"tickets.{key}", errors[0])
+            self.assertEqual(cfg["tickets"][key], harness_config.DEFAULTS["tickets"][key])
 
     def test_template_is_valid_and_lists_every_key(self):
         with open(os.path.join(ROOT, "templates", "harness.json")) as f:

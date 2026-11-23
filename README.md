@@ -132,7 +132,8 @@ Detection matches text, so it errs towards asking: under `"deny"` a command that
 
 ```text
 .claude-plugin/   plugin.json, marketplace.json
-bin/              dev-harness-config (on the Bash PATH while the plugin is enabled)
+bin/              dev-harness-config, dev-harness-board (on the Bash PATH while the plugin is enabled)
+board/            ticket model, parser and checks behind dev-harness-board
 agents/           implementer, implementer-advanced, reviewer, high-risk-reviewer, silent-failure-hunter
 commands/         plan, start-ticket, review, close-ticket, sync
 hooks/            hooks.json and scripts/:
@@ -149,6 +150,8 @@ tests/            guard (end to end), push policy, config writes, shell scanner,
 ```
 
 `bin/dev-harness-config get <key>` prints one value of the merged config for the current directory (scalars plainly, lists and objects as JSON). Config warnings go to stderr with exit 1 (the value is still printed); an unknown key or bad usage exits 2. Commands use it because `CLAUDE_PLUGIN_ROOT` is not set in the Bash tool's environment.
+
+`bin/dev-harness-board --check [--root DIR]` reads the tracker and ticket files named by the `tickets` settings (`trackerPath`, `dirs`, `featureGlobs`, `idPrefixes`, `twinPlatforms`, `archive`, plus `stateAliases`, `archiveTracker`, `archiveDirs`, `extraColumns`) and prints one line per disagreement: a row and its file with different states, a row without a file or a file without a row, an unknown state, a duplicate ID, a link to a missing file, a twin ticket missing. Exit 0 when clean, 1 when there are problems, 2 on bad usage or an unreadable config. `--json` prints the parsed model. It writes nothing and runs no git.
 
 ## Credits
 
