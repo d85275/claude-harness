@@ -59,6 +59,7 @@ class LiveBoard(unittest.TestCase):
         for t, s in (("XY-1", "Planned"), ("XY-2", "Planned"), ("XY-3", "Done"), ("XY-4", "Blocked"),
                      ("XY-5", "Owner check"), ("XY-6", "Deferred")):
             write(self.root, f"docs/tickets/{t}.md", f"# {t}: Thing {t}\n\n## Status\n\n{s}\n")
+        write(self.root, ".claude/harness.json", '{"tickets": {}}\n')
         git(self.root, "add", "-A")
         git(self.root, "commit", "-qm", "init")
 
@@ -154,7 +155,7 @@ class LiveBoard(unittest.TestCase):
         gitdir = os.path.join(self.base, "sep.gitdir")
         os.makedirs(main)
         git(main, "init", "-q", "-b", "main", "--separate-git-dir", gitdir)
-        for rel in ("docs/tickets/tracker.md", "docs/tickets/XY-1.md"):
+        for rel in ("docs/tickets/tracker.md", "docs/tickets/XY-1.md", ".claude/harness.json"):
             with open(os.path.join(self.root, rel), encoding="utf-8") as f:
                 write(main, rel, f.read())
         git(main, "add", "-A")

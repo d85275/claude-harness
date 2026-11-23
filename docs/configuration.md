@@ -55,6 +55,10 @@ A malformed file, an unknown key, a bad regex or a value of the wrong type is ne
 
 The `tickets` keys drive `dev-harness-board`. This is what each command reads and writes.
 
+### Opt-in
+
+The plugin's ticket features act only in a project where a `harness.json` (any file the loader reads, not the built-in defaults) has a `tickets` section; `/ticket-init` writes one. A plain subfolder of an opted-in repository counts as opted in; a `harness.json` in a folder above the repository never opts the repository in; a linked worktree follows its main checkout. `dev-harness-board status` prints whether that is so and why (exit 0 yes, 1 no). Without it, `set-state`, `archive` and `install-hooks` refuse with exit 1 and change nothing, the `hook` mode does nothing, and the plain render writes nothing unless `--out` is given; `--check`, `--json`, `twin` and `init` still work. `/start-ticket`, `/review`, `/close-ticket` and the implementer agents skip their state and board steps there.
+
 ### Check and build
 
 `bin/dev-harness-board --check [--root DIR]` reads the tracker and ticket files named by the `tickets` settings (`trackerPath`, `dirs`, `featureGlobs`, `idPrefixes`, `twinPlatforms`, `archive`, plus `stateAliases`, `archiveTracker`, `archiveDirs`, `extraColumns`, `titleColumn`) and prints one line per disagreement: a row and its file with different states, a row without a file (except a Done row or one in the archive tracker, which is old history and needs no ticket file) or a file without a row, an unknown state, a duplicate ID, a link to a missing file, a twin ticket missing. Exit 0 when clean, 1 when there are problems, 2 on bad usage or an unreadable config. `--json` prints the parsed model. It writes nothing, ignores live worktrees (it compares only the main checkout's row with its file) and runs no git for its result.

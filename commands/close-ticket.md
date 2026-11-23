@@ -7,6 +7,8 @@ Close ticket **$ARGUMENTS**.
 
 Conventions come from the project's Harness section (default: worktree `.worktrees/<id-lowercase>`, branch `feature/<id-lowercase>`, integration branch `main`).
 
+Run the state and board steps below only when `dev-harness-board status` exits 0 (the project has opted in with a `tickets` section in its `harness.json`); otherwise skip them silently and follow the project's own Harness section. (This covers every `dev-harness-board` call here; the cherry-pick, checks and cleanup always run.)
+
 ## 1. Preconditions - stop and report if any fails
 
 - Worktree and branch exist; `git -C <worktree> status --short` is empty, or its only changes are `set-state` edits (the Fixing from a review round): then run `dev-harness-board set-state <ID> "In review" --root <worktree>`, which restores the committed bytes of the tracker row and Status line, and check the status is empty; the branch has exactly one commit over its base.
@@ -17,7 +19,7 @@ Conventions come from the project's Harness section (default: worktree `.worktre
 
 ## 2. Integrate
 
-`git cherry-pick <sha>` on the integration branch. If the only conflicts are this ticket's own tracker row and Status line (parallel tickets touch adjacent rows), take the integration-branch side (`git checkout --ours <tracker> <ticket file>`, `git add`, `git cherry-pick --continue`); step 4 sets Done anyway. On conflict in handoff/evidence docs, merge both sides' entries; on any other conflict, stop and report.
+`git cherry-pick <sha>` on the integration branch. If the only conflicts are this ticket's own tracker row and Status line (parallel tickets touch adjacent rows), (opted-in projects only) take the integration-branch side (`git checkout --ours <tracker> <ticket file>`, `git add`, `git cherry-pick --continue`); step 4 sets Done anyway. On conflict in handoff/evidence docs, merge both sides' entries; on any other conflict, stop and report.
 
 ## 3. Integrated check
 

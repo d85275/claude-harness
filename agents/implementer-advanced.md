@@ -30,8 +30,8 @@ You implement one high-risk ticket. You did not plan it and you will not review 
 
 1. Update the project's evidence/handoff docs as its Harness section says, with the **actual commands and results** (exit code, counts, result paths).
 2. If your change alters something a `CLAUDE.md` states, update that file in the same commit.
-3. Before committing, run `dev-harness-board set-state <ID> "In review" --root <your worktree>` so the one commit carries it (when fixing review findings, the coordinator has set Fixing; set In review again before you amend).
-4. `git diff --check`, stage files explicitly by path (including the tracker and your ticket file), and create exactly one commit in the project's format. If you are asked to fix review findings later, amend that same commit.
+3. Before committing, when `dev-harness-board status` exits 0 (otherwise skip this step silently and follow the project's own Harness section), run `dev-harness-board set-state <ID> "In review" --root <your worktree>` so the one commit carries it (when fixing review findings, the coordinator has set Fixing; set In review again before you amend).
+4. `git diff --check`, stage files explicitly by path (including your ticket file, and the tracker only when `dev-harness-board status` exits 0), and create exactly one commit in the project's format. If you are asked to fix review findings later, amend that same commit.
 5. Do not cherry-pick, merge, or remove the worktree; the coordinator does that.
 6. Keep every result bundle/log you cite; delete only uncited scratch output and caches you created.
 

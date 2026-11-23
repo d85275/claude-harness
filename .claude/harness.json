@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "tickets": {
+    "dirs": ["docs/tickets"],
+    "trackerPath": "docs/tickets/tracker.md",
+    "integrationBranch": "main",
+    "boardPath": "docs/tickets/board.html"
+  }
+}

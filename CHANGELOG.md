@@ -10,6 +10,8 @@ The first release with a ticket system and board. It also makes the guards stric
 
 ### Added
 
+- **Ticket features are opt-in.** `set-state`, `archive`, `install-hooks`, the git hook mode and the board render act only in a project whose `harness.json` has a `tickets` section; elsewhere they refuse or do nothing, and `/start-ticket`, `/review`, `/close-ticket` and the implementers skip their ticket steps. New `dev-harness-board status` says which case applies. `/plan` writes ticket files and tracker rows only in an opted-in project, and otherwise writes the plan to the project's plan location. (CH-29)
+
 **Guards**
 
 - **Push policy.** A new `pushPolicy` setting decides what happens to `git push` and GitHub publishing (`gh pr create` and `merge`, `gh repo create` and `delete`, `gh release create`, `gh gist create`): `"ask"` (the default) asks you each time, `"deny"` blocks them, `"allow"` lets them through, subagents included, but only while no `harness.json` has uncommitted changes. (CH-03)

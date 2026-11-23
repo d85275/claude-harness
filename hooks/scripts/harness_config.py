@@ -389,6 +389,20 @@ def detection_roots(cwd):
     return roots
 
 
+def tickets_sources(cwd):
+    """Config files (as `locate` finds them) that hold a `tickets` object; empty when the project
+    has not opted in to the plugin's ticket system. Built-in defaults do not count. Never raises."""
+    try:
+        found = []
+        for path in locate(cwd)[0]:
+            raw = _load_file(path)[1]
+            if isinstance(raw, dict) and isinstance(raw.get("tickets"), dict):
+                found.append(path)
+        return found
+    except Exception:
+        return []
+
+
 def load_config(cwd):
     cfg, errors, _ = load_all(cwd)
     return cfg, errors

@@ -13,6 +13,6 @@ Sync check **$ARGUMENTS**.
    - handoff "active ticket" / "next step" lines that are stale;
    - owner decisions and deferred items recorded as open;
    - counts: done / in progress / remaining.
-4. Run `dev-harness-board --check` and list every line it prints (a clean run: say so).
+4. When `dev-harness-board status` exits 0 (otherwise skip this step and step 5's `--json` use, and read the project's own tracker), run `dev-harness-board --check` and list every line it prints (a clean run: say so).
 5. **Release check.** Before a release candidate, list every open ticket (`dev-harness-board --json`; open means not Done): the Planned ones aimed at the next release, and every Owner check. "Aimed at the next release" means a `release:<name>` label in the ticket's `## Labels` section (`labels` in the JSON), or a ticket named in the release section of `docs/STATUS.md`. If nothing marks any ticket, list all Planned ones and say that no release marking exists.
 6. Do not edit anything. Offer the specific doc fixes for the owner to approve.

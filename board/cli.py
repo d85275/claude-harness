@@ -6,6 +6,11 @@
     dev-harness-board init [--root DIR] --prefix P [--dry-run]   (new project; see board/init.py)
     dev-harness-board set-state <ID> <State> [--commit SHA] | archive <ID> | twin <ID>   (board/state.py)
     dev-harness-board hook <name> [args]           (run by the installed git hooks)
+    dev-harness-board status [--root DIR]          yes (exit 0) or no (exit 1): has the project opted in?
+
+Opt-in: the plugin's ticket features act only where a harness.json (not the built-in defaults) has a
+`tickets` section. Without one, set-state, archive, install-hooks refuse (exit 1), hook does nothing,
+and the plain render writes nothing unless --out is given; --check, --json, twin and init still work.
 
 (no flag) write tickets.boardPath (or --out) atomically; print the path written
 --check   print one line per problem; exit 1 if any, else 0. A board file older than the tracker
@@ -68,6 +73,52 @@ def load_tickets_config(root):
         else:
             os.environ["CLAUDE_PROJECT_DIR"] = saved
     return cfg["tickets"], errors
+
+
+def tickets_sources(root):
+    """Config files at `root` (outer CLAUDE_PROJECT_DIR ignored) that hold a `tickets` section."""
+    saved = os.environ.get("CLAUDE_PROJECT_DIR")
+    os.environ["CLAUDE_PROJECT_DIR"] = root
+    try:
+        return harness_config.tickets_sources(root)
+    finally:
+        if saved is None:
+            os.environ.pop("CLAUDE_PROJECT_DIR", None)
+        else:
+            os.environ["CLAUDE_PROJECT_DIR"] = saved
+
+
+NOT_SWITCHED = "this project has not switched to the plugin's ticket system; nothing changed"
+GATED = ("set-state", "archive", "install-hooks", "hook")
+
+
+def _root_arg(argv):
+    for i, a in enumerate(argv):
+        if a == "--root" and i + 1 < len(argv):
+            return argv[i + 1]
+        if a.startswith("--root="):
+            return a[len("--root="):]
+    return None
+
+
+def _command_root(argv):
+    start = os.path.abspath(_root_arg(argv)) if _root_arg(argv) else find_root(os.getcwd())
+    # a linked worktree is judged by its main checkout: main decides
+    return (worktrees.main_checkout(start) or start) if os.path.isdir(start) else None
+
+
+def run_status(argv, out, err):
+    """Print whether the project uses the plugin's ticket system and why; exit 0 yes, 1 no."""
+    root = _command_root(argv)
+    if root is None:
+        err.write("dev-harness-board status: --root is not a directory\n")
+        return 2
+    found = tickets_sources(root)
+    if found:
+        out.write(f"yes: {found[0]} has a tickets section\n")
+        return 0
+    out.write("no: no harness.json has a tickets section (" + NOT_SWITCHED.split(";")[0] + ")\n")
+    return 1
 
 
 def build_model(root, tickets_cfg, live=False):
@@ -196,7 +247,7 @@ def run_render(ctx):
 MODES = {"check": run_check, "json": run_json, "render": run_render}
 COMMANDS = {"install-hooks": githooks.run_install, "uninstall-hooks": githooks.run_uninstall,
             "hook": githooks.run_hook, "init": initmod.run,
-            "set-state": state.run_set_state, "archive": state.run_archive, "twin": state.run_twin}
+            "status": run_status, "set-state": state.run_set_state, "archive": state.run_archive, "twin": state.run_twin}
 
 
 def pick_mode(args):
@@ -230,6 +281,15 @@ USAGE = ("usage: dev-harness-board [--root DIR] [--out PATH | --check | --json]\
 
 def main(argv, out=None, err=None):
     out, err = out or sys.stdout, err or sys.stderr
+    if argv and argv[0] in GATED:
+        root = _command_root(argv[1:])
+        # a broken config: the hook still reports it
+        if root is not None and not tickets_sources(root):
+            if argv[0] != "hook":
+                err.write(f"dev-harness-board {argv[0]}: {NOT_SWITCHED}\n")
+                return 1
+            if not any(f in e for e in load_tickets_config(root)[1] for f in FATAL_CONFIG):
+                return 0
     if argv and argv[0] in COMMANDS:
         return COMMANDS[argv[0]](list(argv[1:]), out, err)
     try:
@@ -256,5 +316,8 @@ def main(argv, out=None, err=None):
     err.write(harness_config.format_errors(errors))
     if any(f in e for e in errors for f in FATAL_CONFIG):
         return 2
+    if mode == "render" and args.out is None and not tickets_sources(root):
+        err.write(f"dev-harness-board: {NOT_SWITCHED}; use --out to write a board file anyway\n")
+        return 1
     ctx = {"root": root, "cfg": cfg, "model": build_model(root, cfg, live=mode != "check"), "args": args, "out": out, "err": err}
     return MODES[mode](ctx)

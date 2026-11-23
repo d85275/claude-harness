@@ -293,8 +293,11 @@ def run(argv, out, err):
         out.write("dry run: nothing written\n")
         return 0
     code = 0
-    if steps:
+    if steps and cli.tickets_sources(root):
         code = cli.main(["--root", root], out, err)     # build the board once
+    elif steps:
+        out.write("board not built: no harness.json has a tickets section yet; add one by hand, "
+                  "then run dev-harness-board\n")
     out.write("Next, if you want git to rebuild the board by itself, run: dev-harness-board install-hooks\n"
               "(init does not install hooks; the guard asks before that command)\n")
     return code

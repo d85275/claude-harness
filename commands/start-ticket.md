@@ -5,6 +5,8 @@ argument-hint: <ticket-id> [notes for this run]
 
 Start ticket **$ARGUMENTS**.
 
+Run the state and board steps below only when `dev-harness-board status` exits 0 (the project has opted in with a `tickets` section in its `harness.json`); otherwise skip them silently and follow the project's own Harness section.
+
 1. Read the project's Harness section (root `CLAUDE.md`) and its handoff/progress doc. Confirm the ticket exists in the spec or plan, its dependencies are integrated, and no owner decision blocks it. If something blocks it, stop and report.
 2. Check the machine: `git status --short` on the main checkout is clean; no stale worktree/branch with this ticket's name; enough free disk (`df -h /`). Note any other ticket currently running.
    Read the ticket's state first (`dev-harness-board --json`, or its tracker row). If it is `Done`, `Blocked` or `Deferred`, stop and ask the owner; continue only if they say so.

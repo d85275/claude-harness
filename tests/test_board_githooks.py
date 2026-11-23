@@ -89,6 +89,7 @@ class Env(unittest.TestCase):
         write(os.path.join(self.root, "docs/tickets/XY-1.md"), ticket("XY-1", "Planned"))
         write(os.path.join(self.root, "docs/tickets/XY-2.md"), ticket("XY-2", "Planned"))
         write(os.path.join(self.root, "notes.txt"), "a\n")
+        write(os.path.join(self.root, ".claude/harness.json"), '{"tickets": {}}\n')
         self.git("add", "-A")
         self.git("commit", "-qm", "init")
 
@@ -494,6 +495,7 @@ class Chaining(Env):
         other = os.path.join(self.base, "other")
         subprocess.run(["git", "init", "-q", "-b", "main", other], env=self.env, check=True)
         self.git("commit", "-q", "--allow-empty", "-m", "b", cwd=other)
+        write(os.path.join(other, ".claude/harness.json"), '{"tickets": {}}\n')
         write(os.path.join(other, ".git", "hooks", "pre-push"),
               '#!/bin/sh\necho "B own pre-push" >>"$HOOK_LOG"; cat >/dev/null\n', 0o755)
         code, out, err = self.board("install-hooks", cwd=other)
@@ -904,7 +906,7 @@ class Installer(Env):
         self.assertEqual(self.board("install-hooks", "--dir", "x")[0], 2)
         plain = os.path.join(self.base, "plain")
         os.makedirs(plain)
-        self.assertEqual(self.board("install-hooks", "--root", plain)[0], 2)
+        self.assertEqual(self.board("install-hooks", "--root", plain)[0], 1)   # not opted in: refused
 
 
 class Uninstall(Env):

@@ -46,6 +46,7 @@ class Base(unittest.TestCase):
                         GIT_COMMITTER_NAME="t", GIT_COMMITTER_EMAIL="t@example.com")
         self.root = os.path.join(self.base, "proj")
         os.makedirs(self.root)
+        write(os.path.join(self.root, ".claude/harness.json"), '{"tickets": {}}\n')
 
     def git(self, cwd, *args):
         p = subprocess.run(["git", *args], cwd=cwd, env=self.env, capture_output=True, text=True)
