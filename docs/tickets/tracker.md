@@ -17,4 +17,4 @@ States: `Planned`, `In progress`, `In review`, `Fixing`, `Owner check`, `Done`, 
 | [CH-09](CH-09.md) | Push policy that lets agents push feature branches, never `main` | high-risk | Planned | | Owner request 2026-11-23; after CH-12 |
 | [CH-10](CH-10.md) | Text written into a file by a data heredoc is not a command | high-risk | Done | 7a42cf4 | 2 high-risk rounds; fail-closed checks for CRLF, comments, shadowed owners |
 | [CH-11](CH-11.md) | Protect SSH private keys and read paths inside `$(…)` | standard | Done | 000f1ee | 1 review round; one flaky integrated run under heavy load, reruns OK |
-| [CH-12](CH-12.md) | Push and protected-config detection fail closed on unsafe heredocs | standard | In progress | | Found in CH-10 review; owner 2026-11-23: before CH-09 |
+| [CH-12](CH-12.md) | Push and protected-config detection fail closed on unsafe heredocs | standard | Done | a2f0c10 | 1 review round |
