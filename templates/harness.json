@@ -23,6 +23,7 @@
     "archiveTracker": "",
     "archiveDirs": [],
     "extraColumns": [],
-    "titleColumn": ""
+    "titleColumn": "",
+    "notesFiles": []
   }
 }

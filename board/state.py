@@ -28,7 +28,7 @@ import tempfile
 
 from . import parse
 from .model import STATES
-from .parse import LINK, split_row
+from .parse import _cell_id, fence_step, split_row
 
 PIPE = re.compile(r"(?<!\\)\|")
 COMMIT_RE = re.compile(r"^[0-9A-Za-z]{4,64}$")
@@ -138,9 +138,14 @@ def _set_cell(body, index, value):
 
 
 def _find_table(lines):
-    """(header index, header cells) of the first table with ID and State columns."""
+    """(header index, header cells) of the first table with ID and State columns, outside code
+    fences (the same table parse.parse_tracker reads)."""
+    fence = None
     for i, line in enumerate(lines):
-        if not line.lstrip().startswith("|"):
+        fence, is_line = fence_step(line.rstrip("\r"), fence)
+        if is_line:
+            continue
+        if fence is not None or not line.lstrip().startswith("|"):
             continue
         header = split_row(line.rstrip("\r"))
         lower = [h.lower() for h in header]
@@ -164,8 +169,7 @@ def _find_row(lines, ticket_id):
         if len(cells) != len(header):
             continue
         raw = cells[[c.lower() for c in header].index("id")]
-        m = LINK.match(raw)
-        if (m.group(1) if m else raw).strip("*_` ").upper() == ticket_id and found is None:
+        if _cell_id(raw) == ticket_id and found is None:      # the parser's rule: `AB-1 :warning:` is AB-1
             found = n
     return header, found, last
 

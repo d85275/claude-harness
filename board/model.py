@@ -34,6 +34,8 @@ class Row:
     extra: dict = field(default_factory=dict)   # other columns, in header order
     archived: bool = False
     source: str = ""                # tracker path (relative to the root)
+    links: list = field(default_factory=list)   # every link target in the row, as written
+    line: int = 0                   # 1-based line of the row in its tracker
 
 
 @dataclass
@@ -45,6 +47,8 @@ class TicketFile:
     status: str = ""                # the Status line as written
     archived: bool = False
     labels: list = field(default_factory=list)   # from an optional '## Labels' section
+    twins: list = field(default_factory=list)    # IDs named by `Twin: <ID>` lines
+    single: bool = False                         # has a `Twin: none` line (no twin wanted)
 
 
 @dataclass
@@ -54,6 +58,7 @@ class Model:
     problems: list = field(default_factory=list)
     warnings: list = field(default_factory=list)   # stderr lines for --check; never change the exit code
     tickets: list = field(default_factory=list)    # merged view, see parse.merge
+    stats: dict = field(default_factory=dict)      # tracker path -> what its tables gave (parse.new_stats)
 
     def as_dict(self):
         return {

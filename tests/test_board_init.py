@@ -137,20 +137,22 @@ class InitTest(unittest.TestCase):
         self.assertEqual(p.returncode, 1)
         self.assertFalse(os.path.exists(os.path.join(self.repo, ".git", "dev-harness")))
 
-    def test_existing_tracker_or_folder_stops_for_adopt_mode(self):
-        self.write("docs/tickets/tracker.md", "| ID | State |\n|---|---|\n")
+    def test_existing_tracker_goes_to_adopt_mode(self):
+        self.write("docs/tickets/tracker.md", "| ID | State |\n|---|---|\n| X-1 | Planned |\n")
+        code, out, err = self.run_bin("init", "--mode")
+        self.assertEqual((code, out.splitlines()[0]), (0, "mode: adopt"), err)
         before = snapshot(self.repo)
-        code, out, err = self.init()
-        self.assertEqual(code, 1)
-        self.assertIn("adopt mode", err)
-        self.assertEqual(snapshot(self.repo), before)
+        code, out, err = self.init("--check")
+        self.assertEqual(snapshot(self.repo), before)      # the dry run writes nothing
+        self.assertIn("adopt mode", out)
+        self.assertNotIn("would create docs/STATUS.md", out)
 
-    def test_existing_ticket_folder_stops(self):
-        self.write("docs/tickets/X-1.md", "# X-1\n")
+    def test_existing_ticket_folder_without_tracker_is_refused(self):
+        self.write("docs/tickets/X-1.md", "# X-1: t\n")
         before = snapshot(self.repo)
         code, out, err = self.init()
         self.assertEqual(code, 1)
-        self.assertIn("adopt mode", err)
+        self.assertIn("no tracker found", out)
         self.assertEqual(snapshot(self.repo), before)
 
     def test_symlinked_targets_are_left_alone(self):

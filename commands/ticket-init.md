@@ -1,20 +1,24 @@
 ---
-description: Set up the ticket system (tracker, ticket template, board, Harness section) in a project that has none. Never overwrites; never installs hooks without asking.
-argument-hint: [--dry-run]
+description: Set up the ticket system (tracker, ticket template, board, Harness section) in a project that has none, or switch a project with existing tickets over after the owner confirms the list of tickets the new board will show. Never overwrites; never edits a ticket; never installs hooks without asking.
+argument-hint: [--dry-run | --check]
 ---
 
 Set up tickets in this project. Arguments: **$ARGUMENTS**
 
-1. Check the project has no tickets yet: no tracker file and no `docs/tickets/` folder. If either exists, stop and say adoption of an existing tracker is a separate mode that is not available yet; write nothing.
-2. Ask the owner, one short question each:
-   - the ticket ID prefix (e.g. `WEB`; several allowed, each optionally `PREFIX:platform:kind`);
-   - the integration branch (default `main`);
-   - archive closed tickets: on or off (default off);
-   - twin platforms (e.g. `ios,android`; default none);
-   - install the git hooks that rebuild the board (default no).
-3. Run `dev-harness-board init --dry-run --prefix <P> [--branch <B>] [--archive] [--twin-platforms <a,b>]` and show the owner the list of files it would write. If the argument was `--dry-run`, stop here.
-4. On the owner's yes, run the same command without `--dry-run`. It writes only files that do not exist, merges missing `tickets` keys into an existing `.claude/harness.json`, appends the Harness section to `CLAUDE.md` only when there is none (an existing one is never edited; the command prints the lines to add, which you put to the owner), builds the board once, and does not commit.
-5. If the owner said yes to hooks, run `dev-harness-board install-hooks` as its own Bash command (the guard asks), or tell the owner to run it. `init` never installs them.
-6. Run `dev-harness-board --check`, then report what was created, what was left alone, and that nothing is committed. Tell the owner to add the generated board file (`tickets.boardPath`, default `docs/tickets/board.html`) to `.gitignore`, because the guard asks before it is committed. Remind the owner to fill the `<...>` placeholders in the new Harness section (verify commands, caches, high-risk categories).
+1. Run `dev-harness-board init --mode`. The tool decides: the first line is `mode: fresh` (nothing looks like tickets), `mode: adopt` (the project already has tickets, or a file that may be one cannot be read) or `mode: switched` (the plugin's board is already in place and `--check` is clean: say there is nothing to change and stop); the second line says why. Never decide this yourself. If the reason says tickets exist only in test or example folders, show the owner that list (run `--check`); only if the owner says they are test data, continue as fresh mode with `--fresh` added to each `init` command.
+2. **Mode fresh**:
+   - Ask the owner, one short question each: the ticket ID prefix (e.g. `WEB`; several allowed, each optionally `PREFIX:platform:kind`); the integration branch (default `main`); archive closed tickets (default off); twin platforms (e.g. `ios,android`; default none); install the git hooks that rebuild the board (default no).
+   - Run `dev-harness-board init --dry-run --prefix <P> [--branch <B>] [--archive] [--twin-platforms <a,b>]` and show the owner the list of files it would write. If the argument was `--dry-run`, stop here.
+   - On the owner's yes, run the same command without `--dry-run`. It writes only files that do not exist, merges missing `tickets` keys into an existing `.claude/harness.json`, appends the Harness section to `CLAUDE.md` only when there is none (an existing one is never edited; it prints the lines to add, which you put to the owner), builds the board once, and does not commit.
+3. **Mode adopt** (old tickets are never rewritten):
+   - Run `dev-harness-board init --check [--branch <B>] > <file>`, with `<file>` a new temporary file (for example from `mktemp`), so no part of the output is cut off. It writes nothing in the project. Pass `--branch <B>` when the output calls the integration branch a guess (ask the owner for the name).
+   - Read the whole file with the Read tool, in parts if it is long, until you have read its last line, `== end of output: N tickets, M not used (K blocking), C could not tell; list hash H ==`. If that line is missing, the output is incomplete: run it again. Tell the owner the number of lines and those counts.
+   - Show the owner the list exactly as printed, all of it: every ticket in every column with its sources, every line under "Not used" with its reason, and every "Could not tell" item. Show long lists in several messages rather than shortening them; never summarise entries away or say "and N more". Also show the match against the old board, the suggested `tickets` settings and the "Retiring the old board" steps. If the argument was `--check` or `--dry-run`, stop here.
+   - If the result says BLOCKED, the switch cannot go ahead whatever the owner says. Help the owner fix the cause without editing tickets: settings go into `.claude/harness.json` with the Edit tool (for example a `stateAliases` entry for an unknown state, or a folder in `dirs`, `archiveDirs` or `featureGlobs` for a ticket file outside them); an unreadable file, a skipped row or another tracker is the owner's to fix in a commit of their own. Then run `--check` again and show the new list.
+   - Only after the whole list has been shown, ask the owner whether it is what the board should show. Only on a clear yes to that list, run the command the output prints: `dev-harness-board init --confirm <hash> [--branch <B>] [--prefix ...]`. It writes only while the list is unchanged; if it says the list changed, show the new list and ask again. Never pass `--confirm` with a hash the owner has not seen.
+   - The switch writes only `.claude/harness.json` (missing `tickets` keys; this is what opts the project in), the Harness section of `CLAUDE.md` when there is none (otherwise it prints the lines to add; put them to the owner), and the board. It proves with hashes that no tracker, ticket or template file changed.
+   - Retiring the old system is the owner's step, in the same commit as the switch, and the command never deletes anything itself: remove the old board script and the old board hooks that the output names; keep Git LFS working by running `git lfs install` before the old `core.hooksPath` is unset, so `<git dir>/hooks` has the LFS hooks the board hooks chain to; keep any hook file the project still needs for other reasons.
+4. Hooks, only if the owner says yes: if the output shows an old `core.hooksPath`, run `git config --local --unset core.hooksPath` (or tell the owner which config it is set in), then `dev-harness-board install-hooks`, each as its own Bash command (the guard asks). `init` never runs them.
+5. Run `dev-harness-board --check`, then report what was written, what was left alone, and that nothing is committed (the owner or coordinator makes one commit). In fresh mode remind the owner to fill the `<...>` placeholders in the new Harness section.
 
-Do not commit anything: the owner or coordinator commits. Running it again changes nothing and says so.
+Do not commit anything. Running it again changes nothing and says so.

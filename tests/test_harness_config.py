@@ -62,7 +62,7 @@ class DefaultTests(LoaderTestCase):
                 "twinPlatforms": None, "archive": False,
                 "trackerPath": "docs/tickets/tracker.md", "integrationBranch": "main",
                 "boardPath": "docs/tickets/board.html", "stateAliases": {},
-                "archiveTracker": "", "archiveDirs": [], "extraColumns": [], "titleColumn": ""}})
+                "archiveTracker": "", "archiveDirs": [], "extraColumns": [], "titleColumn": "", "notesFiles": []}})
 
     def test_defaults_are_not_shared_between_loads(self):
         cfg, _ = harness_config.load_config(self.cwd)
@@ -94,7 +94,7 @@ class DefaultTests(LoaderTestCase):
                          ("stateAliases", {"x": 3}), ("archiveTracker", 5),
                          ("archiveDirs", "docs"), ("archiveDirs", [1]),
                          ("extraColumns", "Owner"), ("extraColumns", [None]),
-                         ("titleColumn", 5), ("titleColumn", ["Name"])):
+                         ("titleColumn", 5), ("titleColumn", ["Name"]), ("notesFiles", "a.md"), ("notesFiles", [1])):
             cfg, errors = self.load(tickets={key: bad})
             self.assertEqual(len(errors), 1, (key, bad))
             self.assertIn(f"tickets.{key}", errors[0])

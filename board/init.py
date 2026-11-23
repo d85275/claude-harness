@@ -8,13 +8,17 @@ docs/STATUS.md and .claude/harness.json; it adds the Harness section to CLAUDE.m
 has none. It merges missing `tickets` keys into an existing harness.json (keys that are present
 are never changed; the file is rewritten with 2-space indent) and never edits an existing
 CLAUDE.md Harness section: it prints what that section lacks. If a tracker or ticket folder
-exists that did not come from `init` (no TEMPLATE.md beside the tracker, and the tracker is not
-the empty one init writes) it stops and writes nothing: adopting trackers is a separate mode. Running it again changes nothing.
+exists, init is in adopt mode (board/adopt.py): `--check` prints the list of tickets the board
+would show and what was not used, with a hash of that list; `--confirm <hash>` is the switch, and
+it writes only while the list still has that hash. Fresh only when there is no tracker with rows (searched, not only at the default
+path) and no ticket file; harness.json settings prove nothing. `--mode` prints fresh, adopt or
+switched (the board at boardPath is this plugin's page and --check is clean: nothing to change).
+Running it again changes nothing.
 
 It never installs the git hooks (that is `install-hooks`, which the guard asks about); it prints
 that next step. After writing, it builds the board once. --dry-run lists what it would do and
-writes nothing and builds nothing. Exit 0 ok, 1 stopped (adopt message, unmergeable
-harness.json), 2 bad usage or unreadable config.
+writes nothing and builds nothing. Exit 0 ok, 1 stopped (unmergeable harness.json; adopt mode
+refused or failed), 2 bad usage or unreadable config.
 """
 import argparse
 import json
@@ -22,6 +26,8 @@ import os
 import re
 import sys
 import tempfile
+
+from . import adopt
 
 HERE = os.path.dirname(os.path.realpath(__file__))
 TEMPLATES = os.path.join(HERE, "..", "templates")
@@ -47,12 +53,19 @@ def parse_args(argv):
     ap.add_argument("--archive", action="store_true")
     ap.add_argument("--twin-platforms")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--check", action="store_true")
+    ap.add_argument("--mode", action="store_true")
+    ap.add_argument("--confirm")
+    ap.add_argument("--fresh", action="store_true")
     ap.add_argument("-h", "--help", action="store_true")
     return ap.parse_args(argv)
 
 
 USAGE = ("usage: dev-harness-board init [--root DIR] --prefix PREFIX[:platform[:kind]] [--prefix ...]\n"
-         "                              [--branch NAME] [--archive] [--twin-platforms a,b] [--dry-run]\n")
+         "                              [--branch NAME] [--archive] [--twin-platforms a,b] [--dry-run]\n"
+         "                              [--fresh]   (only test or example folders hold tickets: treat them as test data)\n"
+         "       dev-harness-board init --mode | --check [--branch NAME] [--prefix ...] [--root DIR]   (which mode; adopt dry run)\n"
+         "       dev-harness-board init --confirm LIST-HASH [--branch NAME] [--prefix ...] [--root DIR]   (adopt mode: the switch)\n")
 
 
 def _template(name, **values):
@@ -231,14 +244,22 @@ def run(argv, out, err):
     tickets_dir = cfg["dirs"][0] if cfg["dirs"] else "docs/tickets"
     tracker_rel, template_rel = cfg["trackerPath"], os.path.join(tickets_dir, "TEMPLATE.md")
     tracker, template = os.path.join(root, tracker_rel), os.path.join(root, template_rel)
-    has_tracker, has_template = os.path.lexists(tracker), os.path.lexists(template)
-    if has_tracker and not has_template:    # a run that stopped half way left exactly our tracker
-        has_template = _read(tracker) == _template("tracker.md")
-    if (has_tracker or os.path.lexists(os.path.join(root, tickets_dir))) and not (has_tracker and has_template):
-        what = tracker_rel if has_tracker else tickets_dir
-        err.write(f"dev-harness-board init: {what} already exists but was not made by init; nothing written.\n"
-                  "Adopting an existing tracker (adopt mode) is not available yet.\n")
-        return 1
+    mode, why = adopt.decide_mode(root, cfg, fresh_ok=args.fresh)
+    if args.mode:
+        out.write(f"mode: {mode}\nwhy: {why}\n")
+        return 0
+    if mode == "fresh" and "test or example folders" in why:
+        out.write(f"note: {why.split('; ', 1)[1]}\n")
+    if args.confirm and mode != "adopt":
+        err.write(f"dev-harness-board init: --confirm is only for adopt mode; this project is {mode} ({why})\n")
+        return 2
+    if mode == "switched":
+        out.write(f"nothing to change: {why}\n")
+        return 0
+    if mode == "adopt":
+        args.prefix_specs = list(prefixes.items())
+        return adopt.run(root, cfg, args, out, err, _run_steps, _adopt_steps(tickets_dir, args))
+    args.dry_run = args.dry_run or args.check
     if not cfg["idPrefixes"] and not prefixes and not _config_has(root, "idPrefixes"):
         err.write(f"dev-harness-board init: --prefix is required (e.g. --prefix WEB)\n{USAGE}")
         return 2
@@ -269,24 +290,11 @@ def run(argv, out, err):
 
     if not steps:
         out.write("nothing to change: the ticket files, harness.json tickets section and Harness section are in place\n")
-    done = []
-    for verb, rel, content, detail in steps:
-        tail = f" ({detail})" if detail else ""
-        if args.dry_run:
-            out.write(f"would {verb} {rel}{tail}\n")
-            continue
-        try:
-            path = os.path.join(root, rel)
-            if verb == "create":
-                _write_new(path, content)
-            else:
-                _replace(path, content)
-        except OSError as e:
-            err.write(f"dev-harness-board init: cannot write {rel}: {e}\n"
-                      f"partially done; written: {', '.join(done) or 'nothing'}; fix and re-run\n")
-            return 1
-        done.append(rel)
-        out.write(f"{VERBS[verb]} {rel}{tail}\n")
+    if args.dry_run:
+        for verb, rel, content, detail in steps:
+            out.write(f"would {verb} {rel}" + (f" ({detail})" if detail else "") + "\n")
+    elif _run_steps(root, steps, out, err):
+        return 1
     for n in notes:
         out.write(n.rstrip("\n") + "\n")
     if args.dry_run:
@@ -301,6 +309,49 @@ def run(argv, out, err):
     out.write("Next, if you want git to rebuild the board by itself, run: dev-harness-board install-hooks\n"
               "(init does not install hooks; the guard asks before that command)\n")
     return code
+
+
+def _run_steps(root, steps, out, err):
+    """Write each (verb, rel, content, detail) step; 0 when all went through, else 1."""
+    done = []
+    for verb, rel, content, detail in steps:
+        tail = f" ({detail})" if detail else ""
+        try:
+            path = os.path.join(root, rel)
+            if verb == "create":
+                _write_new(path, content)
+            else:
+                _replace(path, content)
+        except OSError as e:
+            err.write(f"dev-harness-board init: cannot write {rel}: {e}\n"
+                      f"partially done; written: {', '.join(done) or 'nothing'}; fix and re-run\n")
+            return 1
+        done.append(rel)
+        out.write(f"{VERBS[verb]} {rel}{tail}\n")
+    return 0
+
+
+def _adopt_steps(tickets_dir, args):
+    """plan_steps for adopt mode: harness.json tickets keys and the CLAUDE.md Harness section."""
+    def plan(root, wanted, eff, notes):
+        steps, blocker, cfg_notes = [], None, []
+        action, content, detail = plan_config(root, wanted, cfg_notes)
+        if any("not edited" in n for n in cfg_notes):        # keys are missing but the file cannot be edited
+            blocker = (f"{CONFIG_REL} cannot be edited (symlink, read-only, repeated key, NaN or a 'tickets' that is not "
+                       "an object), so the settings cannot be written; add the printed block by hand, then re-run")
+        notes.extend(cfg_notes)
+        if action:
+            steps.append((action, CONFIG_REL, content, detail))
+        example = (next(iter(wanted["idPrefixes"]), "PROJ")) + "-12"
+        values = {"tickets-dir": tickets_dir, "tracker-path": wanted["trackerPath"],
+                  "integration-branch": wanted["integrationBranch"], "example-id": example}
+        action, content, note = plan_claude_md(root, _template("CLAUDE-harness-section.md", **values))
+        if action:
+            steps.append((action, "CLAUDE.md", content, "Harness section"))
+        if note:
+            notes.append(note)
+        return steps, blocker
+    return plan
 
 
 def _read(path):

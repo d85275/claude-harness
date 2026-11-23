@@ -56,6 +56,7 @@ DEFAULTS = {
         "archiveDirs": [],
         "extraColumns": [],
         "titleColumn": "",
+        "notesFiles": [],
     },
 }
 
@@ -221,6 +222,7 @@ _TICKETS = {
     "archiveDirs": (_is_str_list, "a list of strings"),
     "extraColumns": (_is_str_list, "a list of strings"),
     "titleColumn": (lambda v: isinstance(v, str), "a string"),
+    "notesFiles": (_is_str_list, "a list of strings"),
 }
 
 

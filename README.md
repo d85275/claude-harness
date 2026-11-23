@@ -91,7 +91,7 @@ Try the [example board](docs/examples/board.html), built from a [made-up sample 
 ## Limits
 
 - Pushes ask by default. Letting agents push feature branches without asking is planned after 1.0.
-- `/ticket-init` sets up new projects only. Moving a project that already has its own tickets is planned after 1.0.
+- A project that already has its own tickets switches over with `/ticket-init`: it shows every ticket the new board would show and switches only after you confirm that list. It never rewrites old tickets; removing an old board script and hooks is up to you.
 - The guards miss indirect forms; see [docs/guards.md](docs/guards.md).
 
 [CHANGELOG](CHANGELOG.md) · [Contributing](CONTRIBUTING.md)

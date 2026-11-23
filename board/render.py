@@ -11,8 +11,9 @@ import tempfile
 import zlib
 
 from . import assets
+from .check import twin_map
 from .markdown import esc, render as markdown
-from .parse import prefix_info, read_text
+from .parse import read_text
 
 COLUMNS = (
     ("Planned", ("Planned",)),
@@ -78,21 +79,6 @@ def read_commit(root):
     except (OSError, ValueError):
         pass
     return ""
-
-
-def _twins(tickets, cfg):
-    """id -> ids of tickets with the same kind and number on another twin platform."""
-    plats = cfg["twinPlatforms"] or []
-    groups = {}
-    for t in tickets:
-        if t["platform"] in plats:      # same rule as check.py: the prefix kind, not a file label
-            _, kind = prefix_info(t["id"], cfg["idPrefixes"])
-            groups.setdefault((kind, t["id"].rpartition("-")[2]), []).append(t)
-    out = {}
-    for members in groups.values():
-        for t in members:
-            out[t["id"]] = [o["id"] for o in members if o["platform"] != t["platform"]]
-    return out
 
 
 def _icon(kind):
@@ -175,7 +161,7 @@ def build_html(model, root, cfg, built_at, commit):
     for p in model.problems:
         if p.ticket:
             by_ticket.setdefault(p.ticket, []).append(p)
-    twins = _twins(tickets, cfg)
+    twins = twin_map(tickets, cfg)[0]
     columns = {name: [] for name, _ in COLUMNS}
     issues = []
     for t in tickets:
@@ -196,6 +182,7 @@ def build_html(model, root, cfg, built_at, commit):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="dev-harness-board">
 <title>Ticket board</title>
 <style>{assets.CSS}</style>
 </head>

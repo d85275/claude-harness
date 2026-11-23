@@ -5,6 +5,7 @@
     dev-harness-board install-hooks | uninstall-hooks [--root DIR] [--check]
     dev-harness-board init [--root DIR] --prefix P [--dry-run]   (new project; see board/init.py)
     dev-harness-board set-state <ID> <State> [--commit SHA] | archive <ID> | twin <ID>   (board/state.py)
+    dev-harness-board init --mode | --check | --confirm HASH   (adopt existing tickets; see board/adopt.py)
     dev-harness-board hook <name> [args]           (run by the installed git hooks)
     dev-harness-board status [--root DIR]          yes (exit 0) or no (exit 1): has the project opted in?
 
