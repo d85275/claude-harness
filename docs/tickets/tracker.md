@@ -20,7 +20,7 @@ States: `Planned`, `In progress`, `In review`, `Fixing`, `Owner check`, `Done`, 
 | [CH-12](CH-12.md) | Push and protected-config detection fail closed on unsafe heredocs | standard | Done | a2f0c10 | 1 review round |
 | [CH-13](CH-13.md) | Stash and `core.hooksPath` checks fail closed; load-tolerant timing tests | standard | Done | 9283d96 | 2 review rounds; fixed a nested-text bypass inherited from CH-12 |
 | [CH-14](CH-14.md) | Ticket parser and `dev-harness-board --check` | standard | Done | c81dfa2 | Milestone B; 1 review round |
-| [CH-15](CH-15.md) | Board HTML | standard | Planned | | Milestone B |
+| [CH-15](CH-15.md) | Board HTML | standard | In progress | | Milestone B |
 | [CH-16](CH-16.md) | Board reads live worktrees | standard | Planned | | Milestone B; owner requirement 2026-11-23 |
 | [CH-17](CH-17.md) | Git hooks that rebuild the board | high-risk | Planned | | Milestone B; chains existing hooks (LFS) |
 | [CH-18](CH-18.md) | `/ticket-init` for a new project | standard | Planned | | Milestone B |
