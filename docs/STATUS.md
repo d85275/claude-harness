@@ -33,6 +33,8 @@ Goal: release **1.0** of the `dev-harness` plugin with a ticket system and a Jir
     - a short worked example of one ticket going through it
     - what the guards stop
     - install and a 5-minute quickstart
+    - rule-by-rule guard detail and the full `harness.json` reference move out to `docs/guards.md` and `docs/configuration.md`, linked from the README (owner, 2026-11-23: the current README is hard to read)
+    - review includes a first-time-reader pass, not only accuracy
   - **Board example** in the README, built from the sample project:
     - light and dark screenshots plus one issue-view screenshot
     - the generated sample board committed as `docs/examples/board.html`, so people can open a working board (and later via GitHub Pages)
