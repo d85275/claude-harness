@@ -3,6 +3,7 @@
     dev-harness-board [--root DIR] [--out PATH]    write the board HTML (default mode)
     dev-harness-board [--root DIR] --check | --json
     dev-harness-board install-hooks | uninstall-hooks [--root DIR] [--check]
+    dev-harness-board init [--root DIR] --prefix P [--dry-run]   (new project; see board/init.py)
     dev-harness-board hook <name> [args]           (run by the installed git hooks)
 
 (no flag) write tickets.boardPath (or --out) atomically; print the path written
@@ -21,7 +22,7 @@ render and json modes run read-only git (`rev-parse`, `worktree list`, each with
 show tickets being built in a worktree on feature/<id>; --check runs no git for its result.
 Add new modes (init) as a function `run_<mode>(ctx)` registered in MODES, and select it in
 `pick_mode`. `ctx` carries root, tickets config, model, args and the streams. Subcommands with
-their own arguments (install-hooks, uninstall-hooks, hook; see board/githooks.py) are in
+their own arguments (init, install-hooks, uninstall-hooks, hook; see board/githooks.py) are in
 COMMANDS as `run(argv, out, err)` and need no model.
 """
 import argparse
@@ -34,6 +35,7 @@ import harness_config  # noqa: E402
 
 from . import check as checks  # noqa: E402
 from . import githooks  # noqa: E402
+from . import init as initmod  # noqa: E402
 from . import parse  # noqa: E402
 from . import render  # noqa: E402
 from . import worktrees  # noqa: E402
@@ -189,7 +191,7 @@ def run_render(ctx):
 
 MODES = {"check": run_check, "json": run_json, "render": run_render}
 COMMANDS = {"install-hooks": githooks.run_install, "uninstall-hooks": githooks.run_uninstall,
-            "hook": githooks.run_hook}
+            "hook": githooks.run_hook, "init": initmod.run}
 
 
 def pick_mode(args):
@@ -216,7 +218,8 @@ def parse_args(argv):
 
 
 USAGE = ("usage: dev-harness-board [--root DIR] [--out PATH | --check | --json]\n"
-         "       dev-harness-board install-hooks | uninstall-hooks [--root DIR] [--check]\n")
+         "       dev-harness-board install-hooks | uninstall-hooks [--root DIR] [--check]\n"
+         "       dev-harness-board init --prefix PREFIX [--root DIR] [--dry-run]\n")
 
 
 def main(argv, out=None, err=None):
