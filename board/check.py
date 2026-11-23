@@ -66,13 +66,13 @@ def check(model, root, cfg):
     tracker_dir = os.path.join(root, os.path.dirname(cfg["trackerPath"]))
     for tid in sorted(set(rows) | set(files), key=_sort_key):
         rs, fs = rows.get(tid, []), files.get(tid, [])
-        if rs and not fs:
+        row_state = resolve_state(rs[0].state, names) if rs else None
+        # Old closed history (a Done row, or any row in the archive tracker) needs no ticket file.
+        if rs and not fs and not (row_state == "Done" or rs[0].archived):
             add(Problem("row-no-file", tid, "tracker row has no ticket file"))
         if fs and not rs:
             add(Problem("file-no-row", tid, f"ticket file {fs[0].path} has no tracker row"))
-        row_state = None
         if rs:
-            row_state = resolve_state(rs[0].state, names)
             if row_state is None:
                 add(Problem("unknown-state", tid, f"tracker row state {rs[0].state!r} is not a known state"))
         file_state = None

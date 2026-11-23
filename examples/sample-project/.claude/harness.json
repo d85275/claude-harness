@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "tickets": {
+    "dirs": ["docs/tickets"],
+    "idPrefixes": {
+      "APP": {"platform": "mobile", "kind": "feature"},
+      "SITE": {"platform": "web", "kind": "feature"},
+      "FEAT": {"platform": "", "kind": "feature"},
+      "FIX": {"platform": "", "kind": "bug"},
+      "OPS": {"platform": "", "kind": "ops"},
+      "DOC": {"platform": "", "kind": "docs"}
+    },
+    "twinPlatforms": ["mobile", "web"],
+    "archive": true,
+    "archiveTracker": "docs/tickets/archive/tracker.md",
+    "archiveDirs": ["docs/tickets/archive"],
+    "trackerPath": "docs/tickets/tracker.md",
+    "boardPath": "docs/tickets/board.html",
+    "extraColumns": ["Owner"],
+    "titleColumn": "Task"
+  }
+}

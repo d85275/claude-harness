@@ -353,6 +353,52 @@ class RobustnessTests(TempProject):
         self.assertEqual((p.returncode, p.stdout, p.stderr), (0, "", ""))
 
 
+class RowWithoutFileTests(TempProject):
+    """Old closed history (Done, or archived) needs no ticket file; other open rows do."""
+
+    def problems(self, **cfg):
+        code, out, _ = self.check()
+        return out.splitlines()
+
+    def test_done_row_without_file_is_fine(self):
+        self.tracker("| AB-01 | Old thing | Done |")
+        self.assertEqual(self.problems(), [])
+
+    def test_aliased_done_row_without_file_is_fine(self):
+        self.config(stateAliases={"Closed": "Done"})
+        self.tracker("| AB-01 | Old thing | Closed |")
+        self.assertEqual(self.problems(), [])
+
+    def test_archived_row_without_file_is_fine(self):
+        self.config(archive=True, archiveTracker="docs/tickets/archive/tracker.md",
+                    archiveDirs=["docs/tickets/archive"])
+        self.tracker("| AB-01 | Live | Planned |")
+        self.ticket("AB-01", "planned")
+        self.tracker("| AB-02 | Old | Deferred |", path="docs/tickets/archive/tracker.md")
+        self.assertEqual(self.problems(), [])
+
+    def test_open_row_without_file_is_still_a_problem(self):
+        for n, state in enumerate(("Planned", "In progress", "Owner check", "Blocked"), 1):
+            self.tracker(f"| AB-0{n} | T | {state} |")
+            self.assertEqual(self.problems(), [f"AB-0{n}: tracker row has no ticket file"], state)
+
+    def test_done_row_with_a_missing_link_is_still_a_problem(self):
+        self.tracker("| [AB-01](AB-01.md) | Old thing | Done |")
+        self.assertEqual(self.problems(),
+                         ["AB-01: link 'AB-01.md' in docs/tickets/tracker.md points to a missing file"])
+
+    def test_done_row_without_file_has_no_mismatch_badge(self):
+        self.tracker("| AB-01 | Old thing | Done |")
+        from board import cli, render
+        cfg, _ = cli.load_tickets_config(self.root)
+        page = render.build_html(cli.build_model(self.root, cfg), self.root, cfg, "T0", "abc")
+        self.assertIn("Old thing", page)
+        card = page[page.index('data-id="AB-01"'):]
+        card = card.split("</button>")[0]
+        self.assertIn('data-mismatch="0"', card)
+        self.assertNotIn(">mismatch<", card)
+
+
 class StateMatchTests(unittest.TestCase):
     def test_resolve(self):
         names = parse.state_names({"Waiting": "Blocked"})

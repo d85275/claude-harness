@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ticket board</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--text:#1d2330;--muted:#5d6678;--line:#d9dde5;--accent:#2457c5;
+--warn:#b4232a;--warn-bg:#fde8e8;--chip:#eceff4;--shadow:0 1px 2px rgba(0,0,0,.08)}
+:root[data-theme=dark]{--bg:#14171d;--panel:#1d222b;--text:#e6e9ef;--muted:#9aa3b5;--line:#313845;
+--accent:#7da6ff;--warn:#ff9a9f;--warn-bg:#41222a;--chip:#2a303b;--shadow:none}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#14171d;--panel:#1d222b;--text:#e6e9ef;
+--muted:#9aa3b5;--line:#313845;--accent:#7da6ff;--warn:#ff9a9f;--warn-bg:#41222a;--chip:#2a303b;--shadow:none}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between;padding:12px 16px}
+h1{font-size:20px;margin:0}
+.built{color:var(--muted);font-size:13px}
+button,select,input{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 9px}
+button{cursor:pointer}
+.tools{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 12px;align-items:center}
+.tools input[type=search]{flex:1 1 200px;min-width:0}
+.tools select{flex:1 1 110px;min-width:0}
+header>div{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tools label{display:flex;gap:6px;align-items:center;color:var(--muted)}
+.tools input[type=checkbox]{padding:0}
+.board{display:grid;grid-template-columns:repeat(6,minmax(220px,1fr));gap:12px;padding:0 16px 24px;overflow-x:auto}
+.col{background:var(--chip);border-radius:8px;padding:8px;min-width:0}
+.col h2{font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:2px 4px 8px;display:flex;justify-content:space-between}
+.card{display:block;width:100%;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:8px;
+padding:9px 10px;margin-bottom:8px;box-shadow:var(--shadow)}
+.card:hover,.card:focus-visible{border-color:var(--accent);outline:none}
+.card[hidden]{display:none}
+.top{display:flex;gap:7px;align-items:center;color:var(--muted);font-size:13px}
+.id{font-weight:600;color:var(--text)}
+.title{margin:4px 0;overflow-wrap:anywhere}
+.icon{display:inline-flex;width:20px;height:20px;border-radius:50%;align-items:center;justify-content:center;
+font-size:11px;font-weight:700;color:#fff;flex:none}
+.tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.tag{font-size:12px;padding:1px 7px;border-radius:10px;background:var(--chip);color:var(--muted);overflow-wrap:anywhere}
+.tag.mismatch{background:var(--warn-bg);color:var(--warn);font-weight:600}
+.tag.high-risk{background:var(--warn-bg);color:var(--warn)}
+.extra{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.empty{color:var(--muted);font-size:13px;padding:4px}
+#issues{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;justify-content:flex-end;z-index:5}
+#issues[hidden],.issue[hidden]{display:none}
+.issue{background:var(--bg);width:min(760px,100%);height:100%;overflow:auto;padding:16px;border-left:1px solid var(--line)}
+.issue .bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.issue h2.name{font-size:20px;margin:6px 0 10px;overflow-wrap:anywhere}
+dl.details{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;background:var(--panel);border:1px solid var(--line);
+border-radius:8px;padding:10px 12px;margin:0 0 14px}
+dl.details dt{color:var(--muted)}dl.details dd{margin:0;overflow-wrap:anywhere}
+.warnbox{background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 12px;margin-bottom:14px}
+.md{overflow-wrap:anywhere}
+.md pre{background:var(--chip);padding:10px;border-radius:6px;overflow:auto}
+.md code{background:var(--chip);padding:1px 4px;border-radius:4px;font-size:90%}
+.md pre code{background:none;padding:0}
+.md table{border-collapse:collapse;display:block;overflow-x:auto}
+.md th,.md td{border:1px solid var(--line);padding:4px 8px;text-align:left}
+.md blockquote{margin:8px 0;padding-left:12px;border-left:3px solid var(--line);color:var(--muted)}
+.md a{color:var(--accent)}
+@media (max-width:700px){.board{grid-template-columns:minmax(0,1fr);overflow-x:visible}.issue{padding:12px}}
+</style>
+</head>
+<body>
+<header><h1>Ticket board</h1><div><span class="built" id="built">built at 2026-11-23 21:51 UTC from unknown commit</span>
+<button type="button" id="theme">Theme</button></div></header>
+<div class="tools">
+<input type="search" id="q" placeholder="Search ID or title" aria-label="Search ID or title">
+<select id="f-kind" aria-label="Kind"><option value="">All kinds</option><option value="bug">bug</option><option value="docs">docs</option><option value="feature">feature</option><option value="ops">ops</option></select>
+<select id="f-platform" aria-label="Platform"><option value="">All platforms</option><option value="mobile">mobile</option><option value="web">web</option></select>
+<select id="f-review" aria-label="Review level"><option value="">All reviews</option><option value="high-risk">high-risk</option><option value="self-review">self-review</option><option value="standard">standard</option></select>
+<label><input type="checkbox" id="f-mismatch"> Mismatches only</label>
+</div>
+<main class="board"><section class="col" aria-label="Planned"><h2><span>Planned</span><span class="count">3</span></h2><button type="button" class="card" data-id="FEAT-1" data-kind="feature" data-platform="" data-review="standard" data-mismatch="0" data-search="feat-1 scan a barcode to add a pantry item"><div class="top"><span class="icon" style="background:hsl(270,45%,40%)" title="feature">F</span><span class="id">FEAT-1</span></div><div class="title">Scan a barcode to add a pantry item</div><div class="tags"><span class="tag standard">standard</span><span class="tag">pantry</span><span class="tag">camera</span></div></button><button type="button" class="card" data-id="FIX-5" data-kind="bug" data-platform="" data-review="self-review" data-mismatch="1" data-search="fix-5 typo on the welcome screen"><div class="top"><span class="icon" style="background:hsl(44,45%,40%)" title="bug">B</span><span class="id">FIX-5</span></div><div class="title">Typo on the welcome screen</div><div class="tags"><span class="tag self-review">self-review</span><span class="tag mismatch">mismatch</span><span class="tag">copy</span></div></button><button type="button" class="card" data-id="SITE-3" data-kind="feature" data-platform="web" data-review="standard" data-mismatch="0" data-search="site-3 meal planner page"><div class="top"><span class="icon" style="background:hsl(270,45%,40%)" title="feature">F</span><span class="id">SITE-3</span></div><div class="title">Meal planner page</div><div class="tags"><span class="tag standard">standard</span><span class="tag">meal-plan</span></div></button><div class="empty" hidden>Nothing here</div></section><section class="col" aria-label="In progress"><h2><span>In progress</span><span class="count">2</span></h2><button type="button" class="card" data-id="APP-3" data-kind="feature" data-platform="mobile" data-review="standard" data-mismatch="0" data-search="app-3 meal planner screen"><div class="top"><span class="icon" style="background:hsl(270,45%,40%)" title="feature">F</span><span class="id">APP-3</span></div><div class="title">Meal planner screen</div><div class="tags"><span class="tag standard">standard</span><span class="tag">meal-plan</span><span class="tag">screen</span></div><div class="extra">Owner: Mira</div></button><button type="button" class="card" data-id="FEAT-2" data-kind="feature" data-platform="" data-review="standard" data-mismatch="0" data-search="feat-2 dark theme for recipe cards"><div class="top"><span class="icon" style="background:hsl(270,45%,40%)" title="feature">F</span><span class="id">FEAT-2</span></div><div class="title">Dark theme for recipe cards</div><div class="tags"><span class="tag standard">standard</span><span class="tag">theme</span><span class="tag">design</span></div><div class="extra">Owner: Jo</div></button><div class="empty" hidden>Nothing here</div></section><section class="col" aria-label="In review"><h2><span>In review</span><span class="count">3</span></h2><button type="button" class="card" data-id="FEAT-4" data-kind="feature" data-platform="" data-review="standard" data-mismatch="0" data-search="feat-4 nutrition totals for a meal plan"><div class="top"><span class="icon" style="background:hsl(270,45%,40%)" title="feature">F</span><span class="id">FEAT-4</span></div><div class="title">Nutrition totals for a meal plan</div><div class="tags"><span class="tag standard">standard</span><span class="tag">meal-plan</span><span class="tag">nutrition</span></div><div class="extra">Owner: Priya</div></button><button type="button" class="card" data-id="FIX-3" data-kind="bug" data-platform="" data-review="standard" data-mismatch="0" data-search="fix-3 cooking timer keeps running after the app closes"><div class="top"><span class="icon" style="background:hsl(44,45%,40%)" title="bug">B</span><span class="id">FIX-3</span></div><div class="title">Cooking timer keeps running after the app closes</div><div class="tags"><span class="tag standard">standard</span><span class="tag">timer</span><span class="tag">battery</span></div><div class="extra">Owner: Jo</div></button><button type="button" class="card" data-id="FIX-4" data-kind="bug" data-platform="" data-review="standard" data-mismatch="0" data-search="fix-4 crash when importing a recipe with no steps"><div class="top"><span class="icon" style="background:hsl(44,45%,40%)" title="bug">B</span><span class="id">FIX-4</span></div><div class="title">Crash when importing a recipe with no steps</div><div class="tags"><span class="tag standard">standard</span><span class="tag">import</span><span class="tag">crash</span></div><div class="extra">Owner: Priya</div></button><div class="empty" hidden>Nothing here</div></section><section class="col" aria-label="Owner check"><h2><span>Owner check</span><span class="count">1</span></h2><button type="button" class="card" data-id="OPS-1" data-kind="ops" data-platform="" data-review="high-risk" data-mismatch="0" data-search="ops-1 rotate the image-hosting access key"><div class="top"><span class="icon" style="background:hsl(343,45%,40%)" title="ops">O</span><span class="id">OPS-1</span></div><div class="title">Rotate the image-hosting access key</div><div class="tags"><span class="tag high-risk">high-risk</span><span class="tag">security</span><span class="tag">ops</span></div><div class="extra">Owner: Priya</div></button><div class="empty" hidden>Nothing here</div></section><section class="col" aria-label="Blocked"><h2><span>Blocked</span><span class="count">2</span></h2><button type="button" class="card" data-id="DOC-2" data-kind="docs" data-platform="" data-review="self-review" data-mismatch="0" data-search="doc-2 translate the help pages"><div class="top"><span class="icon" style="background:hsl(199,45%,40%)" title="docs">D</span><span class="id">DOC-2</span></div><div class="title">Translate the help pages</div><div class="tags"><span class="tag self-review">self-review</span><span class="tag">docs</span><span class="tag">i18n</span></div></button><button type="button" class="card" data-id="OPS-2" data-kind="ops" data-platform="" data-review="standard" data-mismatch="0" data-search="ops-2 move recipe photos to a new host"><div class="top"><span class="icon" style="background:hsl(343,45%,40%)" title="ops">O</span><span class="id">OPS-2</span></div><div class="title">Move recipe photos to a new host</div><div class="tags"><span class="tag standard">standard</span><span class="tag">ops</span><span class="tag">migration</span></div></button><div class="empty" hidden>Nothing here</div></section><section class="col" aria-label="Done"><h2><span>Done</span><span class="count">8</span></h2><button type="button" class="card" data-id="DOC-0" data-kind="docs" data-platform="" data-review="self-review" data-mismatch="0" data-search="doc-0 set up the repository and the readme"><div class="top"><span class="icon" style="background:hsl(199,45%,40%)" title="docs">D</span><span class="id">DOC-0</span></div><div class="title">Set up the repository and the README</div><div class="tags"><span class="tag self-review">self-review</span><span class="tag">archived</span><span class="tag">setup</span></div><div class="extra">Owner: Mira</div></button><button type="button" class="card" data-id="DOC-1" data-kind="docs" data-platform="" data-review="self-review" data-mismatch="0" data-search="doc-1 write the contributor guide"><div class="top"><span class="icon" style="background:hsl(199,45%,40%)" title="docs">D</span><span class="id">DOC-1</span></div><div class="title">Write the contributor guide</div><div class="tags"><span class="tag self-review">self-review</span><span class="tag">docs</span><span class="tag">onboarding</span></div><div class="extra">Owner: Mira</div></button><button type="button" class="card" data-id="FEAT-0" data-kind="feature" data-platform="" data-review="standard" data-mismatch="0" data-search="feat-0 first recipe list screen"><div class="top"><span class="icon" style="background:hsl(270,45%,40%)" title="feature">F</span><span class="id">FEAT-0</span></div><div class="title">First recipe list screen</div><div class="tags"><span class="tag standard">standard</span><span class="tag">archived</span></div><div class="extra">Owner: Jo</div></button><button type="button" class="card" data-id="FEAT-3" data-kind="feature" data-platform="" data-review="standard" data-mismatch="0" data-search="feat-3 share a recipe as a link"><div class="top"><span class="icon" style="background:hsl(270,45%,40%)" title="feature">F</span><span class="id">FEAT-3</span></div><div class="title">Share a recipe as a link</div><div class="tags"><span class="tag standard">standard</span><span class="tag">sharing</span></div><div class="extra">Owner: Jo</div></button><button type="button" class="card" data-id="FIX-0" data-kind="bug" data-platform="" data-review="standard" data-mismatch="0" data-search="fix-0 fix the launch crash on older phones"><div class="top"><span class="icon" style="background:hsl(44,45%,40%)" title="bug">B</span><span class="id">FIX-0</span></div><div class="title">Fix the launch crash on older phones</div><div class="tags"><span class="tag standard">standard</span></div><div class="extra">Owner: Mira</div></button><button type="button" class="card" data-id="FIX-1" data-kind="bug" data-platform="" data-review="standard" data-mismatch="0" data-search="fix-1 shopping list loses items after a screen rotation"><div class="top"><span class="icon" style="background:hsl(44,45%,40%)" title="bug">B</span><span class="id">FIX-1</span></div><div class="title">Shopping list loses items after a screen rotation</div><div class="tags"><span class="tag standard">standard</span><span class="tag">shopping-list</span><span class="tag">regression</span></div><div class="extra">Owner: Jo</div></button><button type="button" class="card" data-id="FIX-2" data-kind="bug" data-platform="" data-review="standard" data-mismatch="0" data-search="fix-2 search ignores accented letters"><div class="top"><span class="icon" style="background:hsl(44,45%,40%)" title="bug">B</span><span class="id">FIX-2</span></div><div class="title">Search ignores accented letters</div><div class="tags"><span class="tag standard">standard</span><span class="tag">search</span></div><div class="extra">Owner: Mira</div></button><button type="button" class="card" data-id="OPS-0" data-kind="ops" data-platform="" data-review="standard" data-mismatch="0" data-search="ops-0 set up the build server"><div class="top"><span class="icon" style="background:hsl(343,45%,40%)" title="ops">O</span><span class="id">OPS-0</span></div><div class="title">Set up the build server</div><div class="tags"><span class="tag standard">standard</span></div><div class="extra">Owner: Jo</div></button><div class="empty" hidden>Nothing here</div></section></main>
+<div id="issues" role="dialog" aria-modal="true" hidden><section class="issue" data-id="APP-3" hidden><div class="bar"><button type="button" data-close>Close</button><button type="button" data-copy="APP-3">Copy link</button></div><h2 class="name" id="title-APP-3">APP-3: Meal planner screen</h2><dl class="details"><dt>State</dt><dd>In progress</dd><dt>Review</dt><dd>standard</dd><dt>Commit</dt><dd>-</dd><dt>Note</dt><dd>Twin of SITE-3</dd><dt>File</dt><dd>docs/tickets/APP-3.md</dd><dt>Owner</dt><dd>Mira</dd><dt>Twin</dt><dd><a href="#SITE-3">SITE-3</a></dd></dl><div class="md"><h3>Status</h3>
+<p>in progress (2026-03-04)</p>
+<h3>Labels</h3>
+<p>meal-plan, screen</p>
+<h3>Depends on</h3>
+<p>none. The web twin, SITE-3, waits for the plan format fixed here.</p>
+<h3>Scope</h3>
+<p>A week view where each day holds up to four meals. Tapping a slot opens a recipe picker.</p>
+<ul><li>Drag a meal to another day to move it.</li><li>Long-press a meal to remove it.</li><li>The plan is saved as JSON, so the web page can read the same file.</li></ul>
+<pre><code>{&quot;week&quot;: &quot;2026-W10&quot;, &quot;days&quot;: [{&quot;day&quot;: &quot;mon&quot;, &quot;meals&quot;: [&quot;lentil-soup&quot;, &quot;pancakes&quot;]}]}</code></pre>
+<h3>Done criteria</h3>
+<table><thead><tr><th>Check</th><th>How</th></tr></thead><tbody><tr><td>A plan survives closing the app</td><td>UI test: fill a plan, restart, compare</td></tr><tr><td>A meal moves to another day</td><td>UI test with a drag gesture</td></tr><tr><td>The saved file matches the format</td><td>Unit test against the example above</td></tr></tbody></table>
+<p>See the <a href="https://example.com/pantry/meal-planner" rel="noopener noreferrer">design notes</a> for the layout.</p>
+<h3>Allowed files</h3>
+<p><code>app/planner/</code>, <code>app/tests/planner/</code></p>
+<h3>Review level</h3>
+<p>standard</p></div></section><section class="issue" data-id="DOC-0" hidden><div class="bar"><button type="button" data-close>Close</button><button type="button" data-copy="DOC-0">Copy link</button></div><h2 class="name" id="title-DOC-0">DOC-0: Set up the repository and the README</h2><dl class="details"><dt>State</dt><dd>Done</dd><dt>Review</dt><dd>self-review</dd><dt>Commit</dt><dd>0c3a1f9</dd><dt>File</dt><dd>docs/tickets/archive/DOC-0.md</dd><dt>Owner</dt><dd>Mira</dd></dl><div class="md"><h3>Status</h3>
+<p>done (2026-01-12)</p>
+<h3>Labels</h3>
+<p>setup</p>
+<h3>Scope</h3>
+<p>Create the repository, add a README with build steps and a license.</p>
+<h3>Evidence at close</h3>
+<p>README reviewed by a second person; the build steps work on a clean checkout.</p></div></section><section class="issue" data-id="DOC-1" hidden><div class="bar"><button type="button" data-close>Close</button><button type="button" data-copy="DOC-1">Copy link</button></div><h2 class="name" id="title-DOC-1">DOC-1: Write the contributor guide</h2><dl class="details"><dt>State</dt><dd>Done</dd><dt>Review</dt><dd>self-review</dd><dt>Commit</dt><dd>4be07a1</dd><dt>File</dt><dd>docs/tickets/DOC-1.md</dd><dt>Owner</dt><dd>Mira</dd></dl><div class="md"><h3>Status</h3>
+<p>done (2026-02-03)</p>
+<h3>Labels</h3>
+<p>docs, onboarding</p>
+<h3>Scope</h3>
+<p>A one-page guide: how to build the app, run the tests and name a branch.</p>
+<h3>Evidence at close</h3>
+<p>A new contributor followed it on a clean machine and ran the tests.</p></div></section><section class="issue" data-id="DOC-2" hidden><div class="bar"><button type="button" data-close>Close</button><button type="button" data-copy="DOC-2">Copy link</button></div><h2 class="name" id="title-DOC-2">DOC-2: Translate the help pages</h2><dl class="details"><dt>State</dt><dd>Deferred</dd><dt>Review</dt><dd>self-review</dd><dt>Commit</dt><dd>-</dd><dt>Note</dt><dd>After the first release</dd><dt>File</dt><dd>docs/tickets/DOC-2.md</dd></dl><div class="md"><h3>Status</h3>
+<p>deferred (2026-02-20), after the first release</p>
+<h3>Labels</h3>
+<p>docs, i18n</p>
+<h3>Scope</h3>
+<p>Translate the six help pages into Spanish and German.</p></div></section><section class="issue" data-id="FEAT-0" hidden><div class="bar"><button type="button" data-close>Close</button><button type="button" data-copy="FEAT-0">Copy link</button></div><h2 class="name" id="title-FEAT-0">FEAT-0: First recipe list screen</h2><dl class="details"><dt>State</dt><dd>Done</dd><dt>Review</dt><dd>standard</dd><dt>Commit</dt><dd>2d8e47b</dd><dt>File</dt><dd>docs/tickets/archive/FEAT-0.md</dd><dt>Owner</dt><dd>Jo</dd></dl><div class="md"><h3>Status</h3>
+<p>done (2026-01-30)</p>
+<h3>Scope</h3>
+<p>A scrolling list of recipes with a title, a photo and the cooking time.</p>
+<h3>Evidence at close</h3>
+<p>List scrolls smoothly with 500 sample recipes.</p></div></section><section class="issue" data-id="FEAT-1" hidden><div class="bar"><button type="button" data-close>Close</button><button type="button" data-copy="FEAT-1">Copy link</button></div><h2 class="name" id="title-FEAT-1">FEAT-1: Scan a barcode to add a pantry item</h2><dl class="details"><dt>State</dt><dd>Planned</dd><dt>Review</dt><dd>standard</dd><dt>Commit</dt><dd>-</dd><dt>File</dt><dd>docs/tickets/FEAT-1.md</dd></dl><div class="md"><h3>Status</h3>
+<p>planned (2026-03-05)</p>
+<h3>Labels</h3>
+<p>pantry, camera</p>
+<h3>Scope</h3>
+<p>A Scan button in the pantry list reads a barcode with the camera and adds the product by name.</p></div></section><section class="issue" data-id="FEAT-2" hidden><div class="bar"><button type="button" data-close>Close</button><button type="button" data-copy="FEAT-2">Copy link</button></div><h2 class="name" id="title-FEAT-2">FEAT-2: Dark theme for recipe cards</h2><dl class="details"><dt>State</dt><dd>In progress</dd><dt>Review</dt><dd>standard</dd><dt>Commit</dt><dd>-</dd><dt>File</dt><dd>docs/tickets/FEAT-2.md</dd><dt>Owner</dt><dd>Jo</dd></dl><div class="md"><h3>Status</h3>
+<p>in progress (2026-03-05)</p>
+<h3>Labels</h3>
+<p>theme, design</p>
+<h3>Scope</h3>
+<p>Recipe cards follow the system theme. Photos get a thin border in dark mode so they do not blend into the background.</p></div></section><section class="issue" data-id="FEAT-3" hidden><div class="bar"><button type="button" data-close>Close</button><button type="button" data-copy="FEAT-3">Copy link</button></div><h2 class="name" id="title-FEAT-3">FEAT-3: Share a recipe as a link</h2><dl class="details"><dt>State</dt><dd>Done</dd><dt>Review</dt><dd>standard</dd><dt>Commit</dt><dd>7a6e2d4</dd><dt>File</dt><dd>docs/tickets/FEAT-3.md</dd><dt>Owner</dt><dd>Jo</dd></dl><div class="md"><h3>Status</h3>
+<p>done (2026-02-24)</p>
+<h3>Labels</h3>
+<p>sharing</p>
+<h3>Scope</h3>
+<p>A Share button on a recipe copies a link that opens the same recipe in the web app.</p>
+<h3>Evidence at close</h3>
+<p>Link opens the recipe on a second device.</p></div></section><section class="issue" data-id="FEAT-4" hidden><div class="bar"><button type="button" data-close>Close</button><button type="button" data-copy="FEAT-4">Copy link</button></div><h2 class="name" id="title-FEAT-4">FEAT-4: Nutrition totals for a meal plan</h2><dl class="details"><dt>State</dt><dd>In review</dd><dt>Review</dt><dd>standard</dd><dt>Commit</dt><dd>-</dd><dt>File</dt><dd>docs/tickets/FEAT-4.md</dd><dt>Owner</dt><dd>Priya</dd></dl><div class="md"><h3>Status</h3>
+<p>in review (2026-03-03)</p>
+<h3>Labels</h3>
+<p>meal-plan, nutrition</p>
+<h3>Scope</h3>
+<p>Show calories, protein and fibre per day under each day of a meal plan.</p>
+<h3>Done criteria</h3>
+<ul><li>Totals match a hand-calculated example of three meals.</li><li>A recipe with missing nutrition data shows &quot;incomplete&quot;, not zero.</li></ul></div></section><section class="issue" data-id="FIX-0" hidden><div class="bar"><button type="button" data-close>Close</button><button type="button" data-copy="FIX-0">Copy link</button></div><h2 class="name" id="title-FIX-0">FIX-0: Fix the launch crash on older phones</h2><dl class="details"><dt>State</dt><dd>Done</dd><dt>Review</dt><dd>standard</dd><dt>Commit</dt><dd>3e9a7f1</dd><dt>Note</dt><dd>Old ticket, closed before ticket files were kept</dd><dt>Owner</dt><dd>Mira</dd></dl><div class="md"></div></section><section class="issue" data-id="FIX-1" hidden><div class="bar"><button type="button" data-close>Close</button><button type="button" data-copy="FIX-1">Copy link</button></div><h2 class="name" id="title-FIX-1">FIX-1: Shopping list loses items after a screen rotation</h2><dl class="details"><dt>State</dt><dd>Done</dd><dt>Review</dt><dd>standard</dd><dt>Commit</dt><dd>91d3c5e</dd><dt>File</dt><dd>docs/tickets/FIX-1.md</dd><dt>Owner</dt><dd>Jo</dd></dl><div class="md"><h3>Status</h3>
+<p>done (2026-02-10)</p>
+<h3>Labels</h3>
+<p>shopping-list, regression</p>
+<h3>Scope</h3>
+<p>Ticked and unticked items are kept in the view model, not in the screen, so a rotation no longer resets them.</p>
+<h3>Done criteria</h3>
+<ul><li>A test that ticks an item, rotates and checks the item is still ticked fails before the fix.</li></ul>
+<h3>Evidence at close</h3>
+<p>New test passes; the full suite passes.</p></div></section><section class="issue" data-id="FIX-2" hidden><div class="bar"><button type="button" data-close>Close</button><button type="button" data-copy="FIX-2">Copy link</button></div><h2 class="name" id="title-FIX-2">FIX-2: Search ignores accented letters</h2><dl class="details"><dt>State</dt><dd>Done</dd><dt>Review</dt><dd>standard</dd><dt>Commit</dt><dd>c20f8ab</dd><dt>Note</dt><dd>One review round</dd><dt>File</dt><dd>docs/tickets/FIX-2.md</dd><dt>Owner</dt><dd>Mira</dd></dl><div class="md"><h3>Status</h3>
+<p>done (2026-02-17)</p>
+<h3>Labels</h3>
+<p>search</p>
+<h3>Scope</h3>
+<p>Searching for <code>creme</code> finds <code>crème brûlée</code>. Matching ignores accents and letter case.</p>
+<h3>Findings</h3>
+<ul><li>Review round 1: the search also matched inside ingredient notes; narrowed to titles and ingredients.</li></ul>
+<h3>Evidence at close</h3>
+<p>Tests cover <code>creme</code>, <code>CRÈME</code> and <code>crème</code>.</p></div></section><section class="issue" data-id="FIX-3" hidden><div class="bar"><button type="button" data-close>Close</button><button type="button" data-copy="FIX-3">Copy link</button></div><h2 class="name" id="title-FIX-3">FIX-3: Cooking timer keeps running after the app closes</h2><dl class="details"><dt>State</dt><dd>In review</dd><dt>Review</dt><dd>standard</dd><dt>Commit</dt><dd>-</dd><dt>File</dt><dd>docs/tickets/FIX-3.md</dd><dt>Owner</dt><dd>Jo</dd></dl><div class="md"><h3>Status</h3>
+<p>in review (2026-03-02)</p>
+<h3>Labels</h3>
+<p>timer, battery</p>
+<h3>Scope</h3>
+<p>Stop the timer&#x27;s background work when the app is closed, and show a notification instead of ringing in the background.</p>
+<h3>Done criteria</h3>
+<ul><li>Closing the app cancels the countdown job.</li><li>A finished timer shows one notification.</li></ul></div></section><section class="issue" data-id="FIX-4" hidden><div class="bar"><button type="button" data-close>Close</button><button type="button" data-copy="FIX-4">Copy link</button></div><h2 class="name" id="title-FIX-4">FIX-4: Crash when importing a recipe with no steps</h2><dl class="details"><dt>State</dt><dd>Fixing</dd><dt>Review</dt><dd>standard</dd><dt>Commit</dt><dd>-</dd><dt>Note</dt><dd>Reviewer asked for a test</dd><dt>File</dt><dd>docs/tickets/FIX-4.md</dd><dt>Owner</dt><dd>Priya</dd></dl><div class="md"><h3>Status</h3>
+<p>fixing (2026-03-04)</p>
+<h3>Labels</h3>
+<p>import, crash</p>
+<h3>Scope</h3>
+<p>Importing a recipe file with an empty <code>steps</code> list crashes the detail screen. Show the recipe with a note &quot;No steps yet&quot;.</p>
+<h3>Findings</h3>
+<ul><li>Review round 1: the fix is right, but there is no test for the empty list. Added to the fix list.</li></ul></div></section><section class="issue" data-id="FIX-5" hidden><div class="bar"><button type="button" data-close>Close</button><button type="button" data-copy="FIX-5">Copy link</button></div><h2 class="name" id="title-FIX-5">FIX-5: Typo on the welcome screen</h2><div class="warnbox"><strong>Mismatch</strong><ul><li>tracker says Planned but docs/tickets/FIX-5.md says In progress</li></ul></div><dl class="details"><dt>State</dt><dd>Planned</dd><dt>Review</dt><dd>self-review</dd><dt>Commit</dt><dd>-</dd><dt>File</dt><dd>docs/tickets/FIX-5.md</dd></dl><div class="md"><h3>Status</h3>
+<p>in progress (2026-03-06)</p>
+<h3>Labels</h3>
+<p>copy</p>
+<h3>Scope</h3>
+<p>&quot;Welcom to Pantry&quot; becomes &quot;Welcome to Pantry&quot;.</p>
+<h3>Note</h3>
+<p>This ticket file says &quot;in progress&quot; while the tracker row still says Planned. The mismatch is planted on purpose, so the board shows a mismatch badge and <code>dev-harness-board --check</code> reports one problem.</p></div></section><section class="issue" data-id="OPS-0" hidden><div class="bar"><button type="button" data-close>Close</button><button type="button" data-copy="OPS-0">Copy link</button></div><h2 class="name" id="title-OPS-0">OPS-0: Set up the build server</h2><dl class="details"><dt>State</dt><dd>Done</dd><dt>Review</dt><dd>standard</dd><dt>Commit</dt><dd>8b2c4d6</dd><dt>Note</dt><dd>Old ticket, closed before ticket files were kept</dd><dt>Owner</dt><dd>Jo</dd></dl><div class="md"></div></section><section class="issue" data-id="OPS-1" hidden><div class="bar"><button type="button" data-close>Close</button><button type="button" data-copy="OPS-1">Copy link</button></div><h2 class="name" id="title-OPS-1">OPS-1: Rotate the image-hosting access key</h2><dl class="details"><dt>State</dt><dd>Owner check</dd><dt>Review</dt><dd>high-risk</dd><dt>Commit</dt><dd>5e1b9f3</dd><dt>Note</dt><dd>Needs the owner to confirm the new key works</dd><dt>File</dt><dd>docs/tickets/OPS-1.md</dd><dt>Owner</dt><dd>Priya</dd></dl><div class="md"><h3>Status</h3>
+<p>owner check (2026-03-06)</p>
+<h3>Labels</h3>
+<p>security, ops</p>
+<h3>Scope</h3>
+<p>Replace the access key the app uses to upload recipe photos. The old key stops working after the switch.</p>
+<h3>Done criteria</h3>
+<ul><li>The new key is stored in the secret manager, never in the repository.</li><li>Uploading a photo from a test account works with the new key.</li><li>The old key is revoked.</li></ul>
+<h3>Review level</h3>
+<p>high-risk (credentials)</p>
+<h3>Evidence at close</h3>
+<p>Upload from the test account works. Waiting for the owner to confirm and to revoke the old key.</p></div></section><section class="issue" data-id="OPS-2" hidden><div class="bar"><button type="button" data-close>Close</button><button type="button" data-copy="OPS-2">Copy link</button></div><h2 class="name" id="title-OPS-2">OPS-2: Move recipe photos to a new host</h2><dl class="details"><dt>State</dt><dd>Blocked</dd><dt>Review</dt><dd>standard</dd><dt>Commit</dt><dd>-</dd><dt>Note</dt><dd>Waiting for the hosting contract</dd><dt>File</dt><dd>docs/tickets/OPS-2.md</dd></dl><div class="md"><h3>Status</h3>
+<p>blocked (2026-03-01), waiting for the hosting contract</p>
+<h3>Labels</h3>
+<p>ops, migration</p>
+<h3>Scope</h3>
+<p>Copy all recipe photos to the new host and switch the app&#x27;s photo base address.</p>
+<h3>Depends on</h3>
+<p>The signed hosting contract. Nothing can start until it arrives.</p></div></section><section class="issue" data-id="SITE-3" hidden><div class="bar"><button type="button" data-close>Close</button><button type="button" data-copy="SITE-3">Copy link</button></div><h2 class="name" id="title-SITE-3">SITE-3: Meal planner page</h2><dl class="details"><dt>State</dt><dd>Planned</dd><dt>Review</dt><dd>standard</dd><dt>Commit</dt><dd>-</dd><dt>Note</dt><dd>Twin of APP-3</dd><dt>File</dt><dd>docs/tickets/SITE-3.md</dd><dt>Twin</dt><dd><a href="#APP-3">APP-3</a></dd></dl><div class="md"><h3>Status</h3>
+<p>planned (2026-03-05)</p>
+<h3>Labels</h3>
+<p>meal-plan</p>
+<h3>Scope</h3>
+<p>The web version of the meal planner. It follows the mobile ticket <a href="APP-3.md" rel="noopener noreferrer">APP-3</a> and uses the same plan format.</p>
+<h3>Depends on</h3>
+<p>APP-3 settles the plan format.</p></div></section></div>
+<script>
+(function(){
+var cards=[].slice.call(document.querySelectorAll('.card'));
+var issues=document.getElementById('issues');
+var panels={};
+[].forEach.call(issues.querySelectorAll('.issue'),function(p){panels[p.getAttribute('data-id')]=p;});
+var q=document.getElementById('q'),fk=document.getElementById('f-kind'),fp=document.getElementById('f-platform'),
+fr=document.getElementById('f-review'),fm=document.getElementById('f-mismatch');
+function applyFilters(){
+  var text=q.value.trim().toLowerCase();
+  cards.forEach(function(c){
+    var ok=(!text||c.getAttribute('data-search').indexOf(text)>=0)
+      &&(!fk.value||c.getAttribute('data-kind')===fk.value)
+      &&(!fp.value||c.getAttribute('data-platform')===fp.value)
+      &&(!fr.value||c.getAttribute('data-review')===fr.value)
+      &&(!fm.checked||c.getAttribute('data-mismatch')==='1');
+    c.hidden=!ok;
+  });
+  [].forEach.call(document.querySelectorAll('.col'),function(col){
+    var n=col.querySelectorAll('.card:not([hidden])').length;
+    col.querySelector('.count').textContent=String(n);
+    col.querySelector('.empty').hidden=n>0;
+  });
+}
+[q,fk,fp,fr,fm].forEach(function(e){e.addEventListener('input',applyFilters);e.addEventListener('change',applyFilters);});
+var opener=null;
+function show(id){
+  var any=false,was=!issues.hidden;
+  Object.keys(panels).forEach(function(k){var on=k===id;panels[k].hidden=!on;if(on)any=true;});
+  issues.hidden=!any;
+  if(any){
+    if(!was){opener=document.activeElement&&document.activeElement.classList.contains('card')?document.activeElement:null;}
+    panels[id].scrollTop=0;
+    issues.setAttribute('aria-labelledby',panels[id].querySelector('h2').id);
+    panels[id].querySelector('[data-close]').focus();
+  }else{
+    issues.removeAttribute('aria-labelledby');
+    if(was&&opener){opener.focus();}
+    opener=null;
+  }
+}
+function fromHash(){
+  var id=(location.hash||'').replace(/^#/,'');
+  try{id=decodeURIComponent(id);}catch(x){}
+  show(Object.prototype.hasOwnProperty.call(panels,id)?id:'');
+}
+cards.forEach(function(c){c.addEventListener('click',function(){location.hash='#'+c.getAttribute('data-id');});});
+issues.addEventListener('click',function(e){
+  var t=e.target;
+  if(t===issues||t.getAttribute('data-close')!==null){history.pushState(null,'',location.pathname+location.search);show('');}
+});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!issues.hidden){history.pushState(null,'',location.pathname+location.search);show('');}});
+window.addEventListener('hashchange',fromHash);
+[].forEach.call(document.querySelectorAll('[data-copy]'),function(b){
+  b.addEventListener('click',function(){
+    var url=location.href.split('#')[0]+'#'+b.getAttribute('data-copy'),old=b.textContent;
+    function done(){b.textContent='Copied';setTimeout(function(){b.textContent=old;},1200);}
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(url).then(done,fallback);}else{fallback();}
+    function fallback(){
+      var t=document.createElement('textarea');t.value=url;document.body.appendChild(t);t.select();
+      var ok=false;try{ok=document.execCommand('copy');}catch(x){}
+      if(ok){done();}else{window.prompt('Copy this link',url);}
+      document.body.removeChild(t);
+    }
+  });
+});
+var root=document.documentElement,tb=document.getElementById('theme');
+function dark(){var t=root.getAttribute('data-theme');return t?t==='dark':window.matchMedia('(prefers-color-scheme: dark)').matches;}
+try{var saved=localStorage.getItem('board-theme');if(saved==='light'||saved==='dark'){root.setAttribute('data-theme',saved);}}catch(x){}
+tb.addEventListener('click',function(){
+  var next=dark()?'light':'dark';root.setAttribute('data-theme',next);
+  try{localStorage.setItem('board-theme',next);}catch(x){}
+});
+applyFilters();
+fromHash();
+})();
+</script>
+</body>
+</html>
