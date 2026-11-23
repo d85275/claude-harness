@@ -8,6 +8,7 @@ scanner knowledge only removes a hit inside a proven data heredoc body (see Shel
 """
 import fnmatch
 import os
+import posixpath
 import re
 import shlex
 import subprocess
@@ -171,6 +172,7 @@ def check(cmd, cfg, cwd, roots):
         shell = ShellCheck(cfg, cwd, roots)
         shell.run(cmd)
         git_state = git_state_hits(shell)
+        commit_dirs = commit_folders(shell)
     except CheckTooLarge:
         return ("ask", "Command too large to check; approve manually. The push policy and "
                 "protected-config checks did not finish within their work budget. "
@@ -199,6 +201,10 @@ def check(cmd, cfg, cwd, roots):
                 f"unless the owner approves. Command: {cmd[:200]}")
     if git_state:
         ask = git_state_ask(git_state, cwd, cmd)
+        if ask:
+            return ask
+    if commit_dirs:
+        ask = commit_ask(commit_dirs, cfg, cmd, roots)
         if ask:
             return ask
     # Reached under "allow" too: a deploy or askCommand chained onto a push still asks.
@@ -372,3 +378,145 @@ def git_state_ask(hits, cwd, cmd):
                         "by all of them, so another agent could pop or drop it. Needs the "
                         f"owner's OK. Command: {cmd[:200]}")
     return None
+
+
+# --- git commit: ask when it would add generated or ignored-looking files (CH-05) --------------
+GENERATED_DIRS = {"node_modules", "build", "dist", ".gradle", "DerivedData", "__pycache__",
+                  ".worktrees"}
+GENERATED_SUFFIXES = (".pyc", ".class", ".o")
+COMMIT_GIT_SECONDS = 3
+COMMIT_FOLDER_LIMIT = 4
+LISTED_PATHS = 10
+NOT_CHECKED = "[dev-harness] could not check staged files"
+
+
+def _notice(text):
+    msg = f"{NOT_CHECKED}: {text}"
+    if msg not in NOTICES:
+        NOTICES.append(msg)
+
+
+def commit_folders(shell):
+    """Folders (`git -C` targets, else the working directory) of each `git commit` in the command,
+    from the segments ShellCheck already read. A commit whose folder cannot be known (after a
+    `cd`, or with --git-dir / --work-tree / GIT_DIR= / GIT_WORK_TREE=) is not checked and adds a
+    notice instead."""
+    folders, seen_cd = [], False
+    for seg, extra in shell.segments:
+        shell.tick()
+        if seg and os.path.basename(seg[0]).lower() in ("cd", "pushd"):
+            seen_cd = True
+        for opts, rest in git_calls(seg):
+            if not (rest and rest[0].lower() == "commit"):
+                continue
+            if any(o in ("--git-dir", "--work-tree") or o.startswith(("--git-dir=", "--work-tree="))
+                   for o, _ in opts) or any(
+                    w.split("=", 1)[0] in ("GIT_DIR", "GIT_WORK_TREE") for w in seg):
+                _notice("commit with --git-dir, --work-tree or GIT_DIR: staged files not checked")
+            elif seen_cd and not extra:
+                _notice("commit after cd: staged files not checked")
+            else:
+                folders += extra or [shell.cwd]
+    return list(dict.fromkeys(os.path.abspath(f) for f in folders))
+
+
+def _git_bytes(folder, args, deadline, data=None):
+    left = deadline - time.monotonic()
+    if left <= 0:
+        raise subprocess.TimeoutExpired("git", COMMIT_GIT_SECONDS)
+    return subprocess.run(["git", "--no-optional-locks", "-C", folder, *args], input=data,
+                          capture_output=True, timeout=left)
+
+
+def _git_error(result):
+    lines = result.stderr.decode("utf-8", "replace").strip().splitlines()
+    return lines[0] if lines else f"git exited with {result.returncode}"
+
+
+def generated_looking(path, boards):
+    parts = path.split("/")
+    return (path in boards or any(p in GENERATED_DIRS for p in parts[:-1])
+            or parts[-1] in GENERATED_DIRS  # a submodule or file named like one
+            or path.endswith(GENERATED_SUFFIXES))
+
+
+def board_paths(board_path, root, project_roots):
+    """The configured board output as repo-relative paths (a set): an absolute value as is, a
+    relative one against each project root (the folder holding harness.json), else the repo."""
+    if os.path.isabs(board_path):
+        candidates = [os.path.realpath(board_path)]
+    else:
+        bases = [os.path.realpath(b) for b in project_roots or ()] or [root]
+        candidates = [os.path.realpath(os.path.join(b, board_path)) for b in bases]
+    found = set()
+    for c in candidates:
+        rel = os.path.relpath(c, root)
+        if not rel.startswith(".."):
+            found.add(rel.replace(os.sep, "/"))
+    if not found and not os.path.isabs(board_path):  # a project root outside this repo
+        found.add(posixpath.normpath(board_path.replace(os.sep, "/")))
+    return found
+
+
+def staged_generated(folder, board_path, project_roots, deadline, found):
+    """Add to found the paths the commit in folder would add that look generated or are ignored.
+    Hits from the path rules are kept in found even if a later git call raises."""
+    top = _git_bytes(folder, ["rev-parse", "--show-toplevel"], deadline)
+    if top.returncode != 0:
+        raise RuntimeError(_git_error(top))
+    root = os.path.realpath(top.stdout.decode("utf-8", "surrogateescape").strip())
+    # --no-renames: a rename or copy into dist/ is an add (diff.renames could hide it).
+    diff = _git_bytes(root, ["diff", "--cached", "--no-renames", "--name-only",
+                             "--diff-filter=A", "-z"], deadline)
+    if diff.returncode != 0:
+        raise RuntimeError(_git_error(diff))
+    added = [p for p in diff.stdout.split(b"\0") if p]
+    boards = board_paths(board_path, root, project_roots) if board_path else set()
+    names = [p.decode("utf-8", "surrogateescape") for p in added]
+    rest = []
+    for raw, n in zip(added, names):
+        if generated_looking(n, boards):
+            if n not in found:
+                found.append(n)
+        else:
+            rest.append(raw)
+    if rest:
+        ignored = _git_bytes(root, ["check-ignore", "--no-index", "--stdin", "-z"], deadline,
+                             b"\0".join(rest) + b"\0")
+        if ignored.returncode not in (0, 1):
+            raise RuntimeError(_git_error(ignored))
+        flagged = {p.decode("utf-8", "surrogateescape") for p in ignored.stdout.split(b"\0") if p}
+        found += [n for n in names if n in flagged and n not in found]
+
+
+def commit_ask(folders, cfg, cmd, roots=()):
+    """("ask", message) when a `git commit` would add generated or ignored-looking files. When git
+    cannot say, a notice is added (never silent); hits found before the failure still ask."""
+    tickets = cfg.get("tickets")
+    board = tickets.get("boardPath") if isinstance(tickets, dict) else None
+    if not isinstance(board, str):
+        board = harness_config.DEFAULTS["tickets"]["boardPath"]
+    board = board.strip()
+    if board in ("", "."):
+        _notice("tickets.boardPath is empty or \".\", so the board output is not checked")
+        board = ""
+    deadline = time.monotonic() + COMMIT_GIT_SECONDS
+    found = []
+    if len(folders) > COMMIT_FOLDER_LIMIT:
+        _notice(f"{len(folders) - COMMIT_FOLDER_LIMIT} folders not checked (more than "
+                f"{COMMIT_FOLDER_LIMIT} commits)")
+        folders = folders[:COMMIT_FOLDER_LIMIT]
+    for folder in folders:
+        try:
+            staged_generated(folder, board, roots, deadline, found)
+        except subprocess.TimeoutExpired:
+            _notice(f"git took longer than {COMMIT_GIT_SECONDS} s")
+        except Exception as e:
+            _notice(str(e) or type(e).__name__)
+    if not found:
+        return None
+    shown = ", ".join(found[:LISTED_PATHS])
+    more = f" (and {len(found) - LISTED_PATHS} more)" if len(found) > LISTED_PATHS else ""
+    return ("ask", f"git commit would add {len(found)} generated or ignored-looking file(s): "
+            f"{shown}{more}. Build output, caches and force-added ignored files usually do not "
+            f"belong in a commit; unstage them or get the owner's OK. Command: {cmd[:200]}")

@@ -636,3 +636,11 @@ cat <<'EOF' > notes.txt
 git config core.hooksPath x
 git stash
 EOF
+=== all=allow
+git commit -m "docs: notes"
+=== all=allow
+git commit --amend --no-edit
+=== all=allow
+make test && git commit -am "fix"
+=== all=allow
+git -C . commit -m "msg"
