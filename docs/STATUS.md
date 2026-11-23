@@ -4,7 +4,7 @@ Goal: release **1.0** of the `dev-harness` plugin with a ticket system and a Jir
 
 ## Milestones
 
-- **A. Foundations** (tickets CH-01 to CH-06, [tracker](tickets/tracker.md)): one `harness.json` schema, model tiers, push policy and other guard additions.
+- **A. Foundations** (tickets CH-01 to CH-09, [tracker](tickets/tracker.md)): one `harness.json` schema, model tiers, push policy and other guard additions.
 - **B. Ticket system and board** (tickets to be written when A is integrated):
   - `/ticket-init`
   - board script: self-contained HTML, `--check`, standard library only
@@ -43,7 +43,7 @@ Goal: release **1.0** of the `dev-harness` plugin with a ticket system and a Jir
 
 ## Next
 
-CH-01 is done (c2efe7d). CH-02 is done (ef867a1). CH-03 is done (b999c7d). CH-08 is done (99aedc3). Tickets run one at a time (owner, 2026-11-22), except that CH-06 may run alongside one other ticket (owner, 2026-11-22). CH-04 is done (19319cb). Running: CH-06 (resumed 2026-11-23 once no build was running) and CH-05. Then CH-07, then Milestone B (owner, 2026-11-23). Every remaining ticket has an explicit catch list and at most 2 review rounds (owner, 2026-11-22).
+CH-01 is done (c2efe7d). CH-02 is done (ef867a1). CH-03 is done (b999c7d). CH-08 is done (99aedc3). Tickets run one at a time (owner, 2026-11-22), except that CH-06 may run alongside one other ticket (owner, 2026-11-22). CH-04 is done (19319cb). Running: CH-06 (resumed 2026-11-23 once no build was running) and CH-05. Then CH-07, then CH-09 (feature-branch pushes, high-risk), then Milestone B (owner, 2026-11-23). Every remaining ticket has an explicit catch list and at most 2 review rounds (owner, 2026-11-22).
 
 ## Owner decisions
 
@@ -52,6 +52,8 @@ CH-01 is done (c2efe7d). CH-02 is done (ef867a1). CH-03 is done (b999c7d). CH-08
 - 2026-11-22: `pushPolicy: "allow"` stays; the guard also asks before shell commands that write protected configs (CH-03). Stricter push detection kept.
 - 2026-11-22: device presets switch on automatically in repos with an Xcode project or `gradlew` (CH-06).
 - 2026-11-22: deploy commands always ask, whatever `pushPolicy` says (CH-03).
+- 2026-11-23: a guard crash on a credential-like call asks instead of allowing (CH-07).
+- 2026-11-23: new `pushPolicy: "feature-branches"`: agents (main session and subagents) may push feature branches without a prompt, never `main`/`master`; anything the guard can't prove asks (CH-09). Replaces the CH-07 subagent-push item.
 
 ## Updating the installed plugin (later, after Milestone A)
 

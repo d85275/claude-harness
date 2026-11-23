@@ -14,3 +14,4 @@ States: `Planned`, `In progress`, `In review`, `Fixing`, `Owner check`, `Done`, 
 | [CH-06](CH-06.md) | Device rules as presets, auto-on for mobile projects | standard | In progress | | Resumed 2026-11-23 once no build was running (owner); paused earlier by a guard false positive on test text |
 | [CH-07](CH-07.md) | Close remaining fail-open paths in the guard | standard + SF | Planned | | From CH-01 review |
 | [CH-08](CH-08.md) | Split `guard.py` into scanner, Bash rules and hook entry | high-risk | Done | 99aedc3 | 1 high-risk round; output identical to main |
+| [CH-09](CH-09.md) | Push policy that lets agents push feature branches, never `main` | high-risk | Planned | | Owner request 2026-11-23; after CH-07 |
