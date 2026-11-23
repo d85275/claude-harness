@@ -1068,3 +1068,115 @@ EOF
 cat > t.txt <<'EOF'
 git config core.hooksPath x
 EOF
+=== all=ask
+dev-harness-board install-hooks
+=== all=ask
+dev-harness-board uninstall-hooks
+=== all=ask
+bin/dev-harness-board install-hooks
+=== all=ask
+/opt/plugin/bin/dev-harness-board uninstall-hooks
+=== all=ask
+python3 /opt/plugin/bin/dev-harness-board install-hooks
+=== all=ask
+python3 -I bin/dev-harness-board uninstall-hooks
+=== all=ask
+ls && dev-harness-board install-hooks
+=== all=ask
+ls; dev-harness-board uninstall-hooks
+=== all=ask
+env X=1 dev-harness-board install-hooks
+=== all=ask
+command dev-harness-board install-hooks
+=== all=ask
+dev-harness-board --root . install-hooks
+=== all=ask
+dev-harness-board install-hooks --root .
+=== all=ask
+bash -c 'dev-harness-board install-hooks'
+=== all=ask
+sh -c "bin/dev-harness-board uninstall-hooks"
+=== all=ask
+echo go | bash -c 'dev-harness-board install-hooks'
+=== all=ask
+bash <<'EOF'
+dev-harness-board install-hooks
+EOF
+=== all=ask
+cp hook.sh .git/dev-harness/hooks/post-commit
+=== all=ask
+echo x > .git/dev-harness/hooks/pre-push
+=== all=ask
+rm .git/dev-harness/hooks/pre-push
+=== all=ask
+rm -rf .git/dev-harness
+=== all=ask
+sed -i s/a/b/ .git/dev-harness/hooks/post-commit
+=== all=ask
+tee /repo/.git/dev-harness/hooks/post-merge
+=== all=ask
+chmod +x .git/dev-harness/hooks/post-commit
+=== all=ask
+bash -c 'echo x >> .git/dev-harness/hooks/pre-push'
+=== all=ask
+mv x /repo/.git/dev-harness/hooks/post-checkout
+=== all=allow
+dev-harness-board
+=== all=allow
+dev-harness-board --check
+=== all=allow
+dev-harness-board --json
+=== all=allow
+dev-harness-board install-hooks --check
+=== all=allow
+dev-harness-board uninstall-hooks --check
+=== all=allow
+dev-harness-board --check install-hooks
+=== all=allow
+bin/dev-harness-board --root . --check
+=== all=allow
+echo install-hooks
+=== all=allow
+ls .git/dev-harness/hooks
+=== all=allow
+cat .git/dev-harness/hooks/pre-push
+=== all=allow
+grep -r board .git/dev-harness/hooks
+=== all=allow
+cat <<'EOF' > notes.txt
+dev-harness-board install-hooks
+EOF
+=== all=ask
+echo `dev-harness-board install-hooks`
+=== all=ask
+x=`dev-harness-board uninstall-hooks`
+=== all=ask
+echo "$(dev-harness-board install-hooks)"
+=== all=ask
+dev-harness-board install-hooks}
+=== all=ask
+echo `bin/dev-harness-board uninstall-hooks`
+=== all=ask
+( dev-harness-board install-hooks )
+=== all=ask
+{ dev-harness-board install-hooks; }
+=== all=ask
+echo `git config --unset core.hooksPath`
+=== all=ask
+echo "$(git config --unset core.hooksPath)"
+=== all=ask
+dev-harness-board --msg 'a;b' install-hooks
+=== all=ask
+bash -c 'dev-harness-board --msg "a;b" install-hooks'
+=== all=ask
+python3 -c "import os; os.system('dev-harness-board install-hooks')"
+=== all=ask
+ssh host 'dev-harness-board install-hooks'
+=== all=ask
+printf '%s' 'dev-harness-board uninstall-hooks' | bash
+=== all=allow
+echo `dev-harness-board install-hooks --check`
+=== all=allow
+echo "$(dev-harness-board --check)"
+=== all=allow
+echo `git config core.hooksPath`

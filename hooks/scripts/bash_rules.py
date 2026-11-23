@@ -244,7 +244,9 @@ def check(cmd, cfg, cwd, roots):
                 f"limits (size {shell_scan.LONGEST_COMMAND} characters, {CREDENTIAL_SECONDS} s). "
                 f"Command: {cmd[:200]}")
     try:
-        shell = ShellCheck(cfg, cwd, roots)
+        configs = cfg.get("protectedConfigs")
+        shell = ShellCheck(dict(cfg, protectedConfigs=[
+            *(configs if isinstance(configs, list) else []), HOOKS_FOLDER_GLOB]), cwd, roots)
         shell.run(cmd)
         git_state = git_state_hits(shell)
         commit_dirs = commit_folders(shell)
@@ -269,6 +271,9 @@ def check(cmd, cfg, cwd, roots):
             return ("ask", 'pushPolicy is "allow", but the push policy file changed in the '
                     "working tree (a harness.json is modified, untracked, deleted or ignored, or "
                     f"git could not tell). Approve this publish manually. Command: {cmd[:200]}")
+    if shell.config_hit and "dev-harness/hooks" in shell.config_hit.replace("\\", "/").lower():
+        return ("ask", HOOKS_FOLDER_MESSAGE.format(path=shell.config_hit)
+                + f" Command: {cmd[:200]}")
     if shell.config_hit:
         return ("ask", "Command looks like it writes, moves, deletes or changes the mode of a "
                 f"protected config ({shell.config_hit}: lint/test thresholds, validators, or "
@@ -331,6 +336,24 @@ CONFIG_VALUE_OPTIONS = {"-f", "--file", "--blob", "--type", "-t", "--default"}
 CONFIG_READ_OPTIONS = {"--get", "--get-all", "--get-regexp", "--get-urlmatch", "-l", "--list"}
 CONFIG_CHANGE_OPTIONS = {"--unset", "--unset-all", "--replace-all", "--add"}
 WORKTREE_SECONDS = 2
+# CH-22: the board's git hooks. install-hooks / uninstall-hooks change core.hooksPath in their own
+# git call, which the rules above cannot see; --check only reads. HOOKS_FOLDER_GLOB is the folder
+# they write (<git-common-dir>/dev-harness/hooks), matched by path shape so no git runs.
+GLUED = "'\"`(){};"  # quotes and shell punctuation glued to a word: `x`, $(x), {x}, "x"
+BOARD_COMMAND = "dev-harness-board"
+BOARD_HOOK_VERBS = {"install-hooks", "uninstall-hooks"}
+BOARD_HOOKS_REGEX = re.compile(r"\bdev-harness-board\b([^\n;&|]{0,500})", re.IGNORECASE)
+HOOKS_FOLDER_GLOB = "**/dev-harness/hooks/**"
+HOOKS_FOLDER_MESSAGE = ("{path} is in the board's git hooks folder (<git dir>/dev-harness/hooks): "
+                        "git runs these scripts on every commit, checkout and push, so changing "
+                        "them needs the owner's OK.")
+
+
+def board_hooks_change(args):
+    """Do the words after dev-harness-board name install-hooks or uninstall-hooks without
+    --check? Only an exact `--check` makes them a read."""
+    args = [w.strip(GLUED) for w in args]
+    return any(w in BOARD_HOOK_VERBS for w in args) and "--check" not in args
 
 
 def hooks_path_write(args):
@@ -387,9 +410,13 @@ def git_state_hits(shell):
     """What a checked command does to shared git state, from the words and text ShellCheck
     already read: {"stash_dirs": folders to count worktrees in or None, "hooks_path": bool}, or
     None. Costs work-budget steps; raises CheckTooLarge like the rest of the shell check."""
-    stash_dirs, stash, hooks = [], False, False
+    stash_dirs, stash, hooks, board = [], False, False, False
     for seg, extra in shell.segments:
         shell.tick()
+        for i, w in enumerate(seg):
+            if (os.path.basename(unglue(w).strip(GLUED)).lower() == BOARD_COMMAND
+                    and board_hooks_change(seg[i + 1:])):
+                board = True
         for opts, rest in git_calls(seg):
             sub = rest[0].lower() if rest else ""
             if hooks_option(opts):
@@ -415,11 +442,14 @@ def git_state_hits(shell):
             hooks = hooks or counts(m)
         for m in GIT_CONFIG_REGEX.finditer(full):
             shell.tick()
-            words = [w.strip("'\"") for w in m.group(1).split()]
+            words = [w.strip(GLUED) for w in m.group(1).split()]
             hooks = hooks or (counts(m) and hooks_path_write(words))
-    if not stash and not hooks:
+        for m in BOARD_HOOKS_REGEX.finditer(full):
+            shell.tick()
+            board = board or (counts(m) and board_hooks_change(m.group(1).split()))
+    if not stash and not hooks and not board:
         return None
-    return {"stash": stash, "stash_dirs": stash_dirs, "hooks_path": hooks}
+    return {"stash": stash, "stash_dirs": stash_dirs, "hooks_path": hooks, "board_hooks": board}
 
 
 def worktree_count(folder):
@@ -437,6 +467,10 @@ def worktree_count(folder):
 
 
 def git_state_ask(hits, cwd, cmd):
+    if hits["board_hooks"]:
+        return ("ask", "dev-harness-board install-hooks / uninstall-hooks set or unset "
+                "core.hooksPath for this repository, so git then runs (or stops running) "
+                f"scripts on every commit, checkout and push. Needs the owner's OK. Command: {cmd[:200]}")
     if hits["hooks_path"]:
         return ("ask", "Command sets or unsets core.hooksPath, which replaces .git/hooks and "
                 "silently disables hooks such as Git LFS's pre-push. Needs the owner's OK. "

@@ -253,6 +253,8 @@ def added_weakening(before, after, extra=()):
 def guard_edit(data, cfg):
     tool_input = data.get("tool_input") or {}
     path = tool_input.get("file_path", "")
+    if matches(path, [bash_rules.HOOKS_FOLDER_GLOB], data.get("cwd"), PROJECT_ROOTS):
+        ask(bash_rules.HOOKS_FOLDER_MESSAGE.format(path=path))  # CH-22: path shape, no git run
     configs = DEFAULT_PROTECTED_CONFIGS + cfg.get("protectedConfigs", [])
     if matches(path, configs, data.get("cwd"), PROJECT_ROOTS):
         ask(f"{path} is a protected config (lint/test thresholds, validators, or guardrails). "
