@@ -14,6 +14,7 @@ States: `Planned`, `In progress`, `In review`, `Fixing`, `Owner check`, `Done`, 
 | [CH-06](CH-06.md) | Device rules as presets, auto-on for mobile projects | standard | Done | 2b18eb4 | 1 review round; paused once by the old installed guard |
 | [CH-07](CH-07.md) | Close remaining fail-open paths in the guard | standard + SF | Done | 3a6ca12 | 2 review rounds; guard blocked its test text twice (owner: file tools for test files) |
 | [CH-08](CH-08.md) | Split `guard.py` into scanner, Bash rules and hook entry | high-risk | Done | 99aedc3 | 1 high-risk round; output identical to main |
-| [CH-09](CH-09.md) | Push policy that lets agents push feature branches, never `main` | high-risk | Planned | | Owner request 2026-11-23; after CH-11 |
+| [CH-09](CH-09.md) | Push policy that lets agents push feature branches, never `main` | high-risk | Planned | | Owner request 2026-11-23; after CH-12 |
 | [CH-10](CH-10.md) | Text written into a file by a data heredoc is not a command | high-risk | Done | 7a42cf4 | 2 high-risk rounds; fail-closed checks for CRLF, comments, shadowed owners |
 | [CH-11](CH-11.md) | Protect SSH private keys and read paths inside `$(…)` | standard | In progress | | Found in CH-10; owner 2026-11-23: before CH-09 |
+| [CH-12](CH-12.md) | Push and protected-config detection fail closed on unsafe heredocs | standard | Planned | | Found in CH-10 review; owner 2026-11-23: before CH-09 |
