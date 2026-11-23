@@ -4,6 +4,7 @@
     dev-harness-board [--root DIR] --check | --json
     dev-harness-board install-hooks | uninstall-hooks [--root DIR] [--check]
     dev-harness-board init [--root DIR] --prefix P [--dry-run]   (new project; see board/init.py)
+    dev-harness-board set-state <ID> <State> [--commit SHA] | archive <ID> | twin <ID>   (board/state.py)
     dev-harness-board hook <name> [args]           (run by the installed git hooks)
 
 (no flag) write tickets.boardPath (or --out) atomically; print the path written
@@ -38,6 +39,7 @@ from . import githooks  # noqa: E402
 from . import init as initmod  # noqa: E402
 from . import parse  # noqa: E402
 from . import render  # noqa: E402
+from . import state  # noqa: E402
 from . import worktrees  # noqa: E402
 
 FATAL_CONFIG = ("cannot read", "must hold a JSON object")
@@ -191,7 +193,8 @@ def run_render(ctx):
 
 MODES = {"check": run_check, "json": run_json, "render": run_render}
 COMMANDS = {"install-hooks": githooks.run_install, "uninstall-hooks": githooks.run_uninstall,
-            "hook": githooks.run_hook, "init": initmod.run}
+            "hook": githooks.run_hook, "init": initmod.run,
+            "set-state": state.run_set_state, "archive": state.run_archive, "twin": state.run_twin}
 
 
 def pick_mode(args):
@@ -219,7 +222,8 @@ def parse_args(argv):
 
 USAGE = ("usage: dev-harness-board [--root DIR] [--out PATH | --check | --json]\n"
          "       dev-harness-board install-hooks | uninstall-hooks [--root DIR] [--check]\n"
-         "       dev-harness-board init --prefix PREFIX [--root DIR] [--dry-run]\n")
+         "       dev-harness-board init --prefix PREFIX [--root DIR] [--dry-run]\n"
+         "       dev-harness-board set-state ID STATE [--commit SHA] | archive ID | twin ID  (see board/state.py)\n")
 
 
 def main(argv, out=None, err=None):
