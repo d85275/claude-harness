@@ -2,18 +2,27 @@
 
     dev-harness-board [--root DIR] [--out PATH]    write the board HTML (default mode)
     dev-harness-board [--root DIR] --check | --json
+    dev-harness-board install-hooks | uninstall-hooks [--root DIR] [--check]
+    dev-harness-board hook <name> [args]           (run by the installed git hooks)
 
 (no flag) write tickets.boardPath (or --out) atomically; print the path written
 --check   print one line per problem; exit 1 if any, else 0. A board file older than the tracker
           or a ticket file adds a "warning: ..." line on stderr (no effect on the exit code)
 --json    print the parsed model as JSON
 
+The board is written only inside the main checkout and never under `.git`: a tickets.boardPath
+that leads elsewhere (absolute, `../`, a symlink) is refused unless --out names the file.
+--check also warns on stderr when this repository's core.hooksPath names a dev-harness hooks
+folder that no longer exists (one `git config` read; not part of the result).
+
 Exit 2: bad usage or unreadable config. Only the render mode writes a file.
 Run from a linked worktree, it works on the main checkout (so the board is written there). The
 render and json modes run read-only git (`rev-parse`, `worktree list`, each with a timeout) to
 show tickets being built in a worktree on feature/<id>; --check runs no git for its result.
-Add new modes (init, install-hooks) as a function `run_<mode>(ctx)` registered in MODES, and
-select it in `pick_mode`. `ctx` carries root, tickets config, model, args and the streams.
+Add new modes (init) as a function `run_<mode>(ctx)` registered in MODES, and select it in
+`pick_mode`. `ctx` carries root, tickets config, model, args and the streams. Subcommands with
+their own arguments (install-hooks, uninstall-hooks, hook; see board/githooks.py) are in
+COMMANDS as `run(argv, out, err)` and need no model.
 """
 import argparse
 import json
@@ -24,6 +33,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..
 import harness_config  # noqa: E402
 
 from . import check as checks  # noqa: E402
+from . import githooks  # noqa: E402
 from . import parse  # noqa: E402
 from . import render  # noqa: E402
 from . import worktrees  # noqa: E402
@@ -67,9 +77,83 @@ def build_model(root, tickets_cfg, live=False):
     return model
 
 
+def board_outside(root, path):
+    """Why `path` may not hold the board (outside the checkout, or under .git), or None."""
+    real_root, real = os.path.realpath(root), os.path.realpath(path)
+    try:
+        rel = os.path.relpath(real, real_root)
+    except ValueError:                  # another drive
+        rel = os.pardir
+    parts = rel.split(os.sep)
+    if rel == os.curdir or parts[0] == os.pardir or os.path.isabs(rel):
+        return f"board not written: tickets.boardPath leads outside {real_root}, to {real}"
+    into_git = f"board not written: tickets.boardPath leads into the git dir, to {real}"
+    if any(p.lower() == ".git" for p in parts):     # `.GIT` is `.git` on a case-insensitive disk
+        return into_git
+    # The robust check: no existing folder on the way (up to the checkout) may be the git dir or
+    # the common dir under another name (case, Unicode form, a separate git dir in the tree).
+    gitdirs = git_dirs(root)
+    d = real
+    while True:
+        if os.path.exists(d) and any(_same(d, g) for g in gitdirs):
+            return into_git
+        if d == real_root or os.path.dirname(d) == d:
+            break
+        d = os.path.dirname(d)
+    # A hard link to a file in the git dir (a rename would leave that file alone, but refuse it)
+    try:
+        st = os.stat(real)
+    except OSError:
+        st = None
+    if st is not None and st.st_nlink > 1 and _inode_in(st, gitdirs):
+        return into_git
+    return None
+
+
+def _same(a, b):
+    try:
+        return os.path.samefile(a, b)
+    except OSError:
+        return False
+
+
+def git_dirs(root):
+    """The per-worktree git dir and the common dir of the checkout at `root` (those that exist)."""
+    found = []
+    dotgit = os.path.join(root, ".git")
+    if os.path.isdir(dotgit):
+        found.append(dotgit)
+    for flag in ("--git-dir", "--git-common-dir"):
+        code, out, _ = githooks._git(["rev-parse", flag], root)
+        if code == 0 and out.strip():
+            d = os.path.abspath(os.path.join(root, out.rstrip("\n")))
+            if os.path.isdir(d) and d not in found:
+                found.append(d)
+    return found
+
+
+def _inode_in(st, folders):
+    key = (st.st_dev, st.st_ino)
+    for top in folders:
+        for d, dirs, files in os.walk(top):
+            dirs[:] = [x for x in dirs if x != "objects"]
+            for n in files:
+                try:
+                    s = os.lstat(os.path.join(d, n))
+                except OSError:
+                    continue
+                if (s.st_dev, s.st_ino) == key:
+                    return True
+    return False
+
+
 def run_check(ctx):
     for p in ctx["model"].problems:
         ctx["out"].write(p.line() + "\n")
+    if os.path.exists(os.path.join(ctx["root"], ".git")):
+        stale = githooks.stale_warning(ctx["root"])
+        if stale:
+            ctx["err"].write(stale + "\n")
     board = board_path(ctx)
     for rel in render.stale_sources(ctx["root"], ctx["cfg"], ctx["model"], board):
         ctx["err"].write(f"warning: board file is older than {rel}; run dev-harness-board to rebuild\n")
@@ -89,6 +173,10 @@ def board_path(ctx):
 
 def run_render(ctx):
     path = board_path(ctx)
+    problem = None if ctx["args"].out else board_outside(ctx["root"], path)
+    if problem:
+        ctx["err"].write(f"dev-harness-board: {problem} (use --out to name a file elsewhere)\n")
+        return 2
     html = render.build_html(ctx["model"], ctx["root"], ctx["cfg"], render.now_utc(), render.read_commit(ctx["root"]))
     try:
         render.write_atomic(path, html)
@@ -100,6 +188,8 @@ def run_render(ctx):
 
 
 MODES = {"check": run_check, "json": run_json, "render": run_render}
+COMMANDS = {"install-hooks": githooks.run_install, "uninstall-hooks": githooks.run_uninstall,
+            "hook": githooks.run_hook}
 
 
 def pick_mode(args):
@@ -125,11 +215,14 @@ def parse_args(argv):
     return ap.parse_args(argv)
 
 
-USAGE = "usage: dev-harness-board [--root DIR] [--out PATH | --check | --json]\n"
+USAGE = ("usage: dev-harness-board [--root DIR] [--out PATH | --check | --json]\n"
+         "       dev-harness-board install-hooks | uninstall-hooks [--root DIR] [--check]\n")
 
 
 def main(argv, out=None, err=None):
     out, err = out or sys.stdout, err or sys.stderr
+    if argv and argv[0] in COMMANDS:
+        return COMMANDS[argv[0]](list(argv[1:]), out, err)
     try:
         args = parse_args(argv)
     except ValueError as e:
