@@ -1,6 +1,7 @@
 """Consistency checks over a parsed Model."""
 from collections import Counter, defaultdict
 import os
+import re
 
 from .model import Problem
 from .parse import prefix_info, resolve_state, state_names
@@ -43,8 +44,8 @@ def merge(model, root, cfg):
 
 
 def _sort_key(tid):
-    prefix, _, num = tid.rpartition("-")
-    return (prefix, int(num) if num.isdigit() else 0, tid)
+    m = re.fullmatch(r"(.*?)-?(\d+)", tid)      # "AB-12" and "L12" both sort by prefix, then number
+    return (m.group(1), int(m.group(2)), tid) if m else (tid, 0, tid)
 
 
 def check(model, root, cfg):

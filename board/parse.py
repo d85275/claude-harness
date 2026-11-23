@@ -6,7 +6,7 @@ import re
 
 from .model import STATES, KNOWN_COLUMNS, Model, Problem, Row, TicketFile
 
-GENERIC_ID = r"[A-Za-z][A-Za-z0-9]*-\d+"
+GENERIC_ID = r"[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z][A-Za-z0-9]*)*-\d+"
 LINK = re.compile(r"^\[([^\]]*)\]\(([^)]*)\)$")
 
 
@@ -176,7 +176,8 @@ def _dirs(root, dirs, globs):
     return list(dict.fromkeys(out)), list(dict.fromkeys(files))
 
 
-def collect_files(root, dirs, globs, pattern, archived, problems):
+def collect_files(root, dirs, globs, pattern, archived, problems, known=frozenset()):
+    """Ticket files: a stem that fits `pattern` or equals an ID in `known` (a tracker row ID)."""
     found, paths = [], []
     folders, extra_files = _dirs(root, dirs, globs)
     for folder in folders:
@@ -188,7 +189,7 @@ def collect_files(root, dirs, globs, pattern, archived, problems):
     paths.extend(p for p in extra_files if p.lower().endswith(".md"))
     for path in dict.fromkeys(paths):
         stem = os.path.basename(path)[:-3]
-        if not os.path.isfile(path) or not pattern.fullmatch(stem):
+        if not os.path.isfile(path) or not (pattern.fullmatch(stem) or stem.upper() in known):
             continue  # TEMPLATE.md, tracker.md, notes
         tf = parse_ticket(path, os.path.relpath(path, root), stem.upper(), archived, problems)
         if tf:
@@ -216,13 +217,15 @@ def build(root, tickets_cfg):
         model.problems.append(Problem("tracker-missing", "", f"{t['trackerPath']}: tracker not found"))
     else:
         model.rows.extend(parse_tracker(tracker, t["trackerPath"], False, model.problems))
-    model.files.extend(collect_files(root, t["dirs"], t["featureGlobs"], pattern, False, model.problems))
+    if t["archive"] and t["archiveTracker"]:
+        path = os.path.join(root, t["archiveTracker"])
+        if not os.path.exists(path):
+            model.problems.append(Problem("tracker-missing", "", f"{t['archiveTracker']}: archive tracker not found"))
+        else:
+            model.rows.extend(parse_tracker(path, t["archiveTracker"], True, model.problems))
+    # Rows are read first so a file named after a row ID is a ticket even when the ID has no hyphen.
+    known = frozenset(r.id for r in model.rows)
+    model.files.extend(collect_files(root, t["dirs"], t["featureGlobs"], pattern, False, model.problems, known))
     if t["archive"]:
-        if t["archiveTracker"]:
-            path = os.path.join(root, t["archiveTracker"])
-            if not os.path.exists(path):
-                model.problems.append(Problem("tracker-missing", "", f"{t['archiveTracker']}: archive tracker not found"))
-            else:
-                model.rows.extend(parse_tracker(path, t["archiveTracker"], True, model.problems))
-        model.files.extend(collect_files(root, t["archiveDirs"], [], pattern, True, model.problems))
+        model.files.extend(collect_files(root, t["archiveDirs"], [], pattern, True, model.problems, known))
     return model

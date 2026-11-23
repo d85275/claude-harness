@@ -184,6 +184,39 @@ class ParsingTests(TempProject):
         self.ticket("AB-01", "done", folder="docs/archive")
         self.assertEqual(self.check()[:2], (0, ""))
 
+    def test_multi_segment_ids_match_files_without_prefixes(self):
+        self.tracker("| AB-CD-01 | T | Planned |", "| EF-02 | T | Done |")
+        self.ticket("AB-CD-01", "planned")
+        self.ticket("EF-02", "done")
+        self.assertEqual(self.check()[:2], (0, ""))
+        t = json.loads(run("--json", "--root", self.root)[1])["tickets"]
+        self.assertEqual([x["id"] for x in t], ["AB-CD-01", "EF-02"])
+
+    def test_hyphenless_id_file_found_through_its_row(self):
+        self.tracker("| [Q1](Q1.md) | T | Planned |", "| Q2 | T | Done |", "| Q10 | T | Planned |")
+        self.ticket("Q1", "planned")
+        self.ticket("Q2", "done")
+        self.ticket("Q10", "done")
+        self.write("docs/tickets/notes.md", "# notes\n")
+        code, out, _ = self.check()
+        self.assertEqual((code, out), (1, "Q10: tracker says Planned but docs/tickets/Q10.md says Done\n"))
+        t = json.loads(run("--json", "--root", self.root)[1])["tickets"]
+        self.assertEqual([x["id"] for x in t], ["Q1", "Q2", "Q10"])      # numeric order
+
+    def test_hyphenless_file_without_a_row_is_not_a_ticket(self):
+        self.tracker("| Q1 | T | Planned |")
+        self.ticket("Q1", "planned")
+        self.ticket("Q2", "planned")
+        self.assertEqual(self.check()[:2], (0, ""))
+
+    def test_archived_hyphenless_ids(self):
+        self.config(archive=True, archiveTracker="docs/archive/tracker.md", archiveDirs=["docs/archive"])
+        self.tracker("| Q2 | T | Planned |")
+        self.ticket("Q2", "planned")
+        self.tracker("| Q1 | Old | Done |", path="docs/archive/tracker.md")
+        self.ticket("Q1", "done", folder="docs/archive")
+        self.assertEqual(self.check()[:2], (0, ""))
+
     def test_feature_globs(self):
         self.config(featureGlobs=["src/features/*"])
         self.tracker("| AB-01 | T | Planned |")
