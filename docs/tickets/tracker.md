@@ -29,8 +29,8 @@ States: `Planned`, `In progress`, `In review`, `Fixing`, `Owner check`, `Done`, 
 | [CH-21](CH-21.md) | Check against real projects (read-only) and dogfood acceptance | standard | Done | aa306f5 | Milestone B; reduced scope (board only), owner 2026-11-23 |
 | [CH-22](CH-22.md) | Guard asks before installing or removing the board's git hooks | standard | Done | 5d4211b | Owner request 2026-11-23 after the CH-17 review; 1 review round |
 | [CH-23](CH-23.md) | Board title from a tracker column with another name | standard | Done | b427170 | Owner request 2026-11-23 |
-| [CH-24](CH-24.md) | Sample project and board example | standard | In progress | | Milestone C |
-| [CH-25](CH-25.md) | README rewrite with guards and configuration reference pages | standard | Planned | | Milestone C |
+| [CH-24](CH-24.md) | Sample project and board example | standard | Done | 2788679 | Milestone C |
+| [CH-25](CH-25.md) | README rewrite with guards and configuration reference pages | standard | In progress | | Milestone C |
 | [CH-26](CH-26.md) | GitHub Actions running the tests | standard | Planned | | Milestone C |
 | [CH-27](CH-27.md) | CHANGELOG, CONTRIBUTING and version 1.0.0 | high-risk | Planned | | Milestone C |
 | [CH-28](CH-28.md) | Pre-publish privacy sweep of the whole history | high-risk | Planned | | Milestone C |
