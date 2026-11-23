@@ -4,7 +4,7 @@
 Usage: dev-harness-config get <key>
 
 Loads the merged config for the current directory (honours CLAUDE_PROJECT_DIR,
-see README "Configuration") and prints the value of a top-level key: scalars
+see docs/configuration.md) and prints the value of a top-level key: scalars
 plainly, lists and objects as JSON.
 
 Exit codes: 0 ok; 1 the value was printed but the config had warnings (written

@@ -67,5 +67,6 @@ url="file://$board"
 shot "$images/board-light.png" 1400,900 "$url" --blink-settings=preferredColorScheme=1
 # Blink's preferredColorScheme: 0 is dark, 1 is light.
 shot "$images/board-dark.png" 1400,900 "$url" --blink-settings=preferredColorScheme=0
-shot "$images/issue-view.png" 1100,900 "$url#APP-3" --blink-settings=preferredColorScheme=1
+# 770 high: ends after the Scope section, above the done-criteria table that would be cut off.
+shot "$images/issue-view.png" 1100,770 "$url#APP-3" --blink-settings=preferredColorScheme=1
 echo "wrote $images/board-light.png, board-dark.png, issue-view.png"

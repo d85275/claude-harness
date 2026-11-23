@@ -27,7 +27,7 @@ Goal: release **1.0** of the `dev-harness` plugin with a ticket system and a Jir
   - the Harness section template that `/ticket-init` writes says ticket-flow changes go to the dev-harness plugin as a request, not into the project's own scripts
   - after the 1.0 plugin update, each project switches over in a ticket run by its own coordinator: run `/ticket-init`; a project with its own board script and board hooks removes them and keeps its extra columns through settings (owner, 2026-11-23)
 - **C. Ready to publish** (tickets CH-23 to CH-28, planned 2026-11-23; CH-23 is the title-column setting from CH-21):
-  - **README rewrite** (owner request 2026-11-22; working draft in [`README-draft.md`](README-draft.md)), so a newcomer understands what the plugin does:
+  - **README rewrite** (owner request 2026-11-22; rewritten in CH-25: [`README.md`](../README.md)), so a newcomer understands what the plugin does:
     - an opening paragraph on the problem it solves and who it is for
     - a picture of the plan -> implement -> review -> integrate loop
     - a short worked example of one ticket going through it

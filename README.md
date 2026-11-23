@@ -1,10 +1,27 @@
-# claude-harness (plugin: `dev-harness`)
+# dev-harness
 
-A small Claude Code plugin for a disciplined **plan -> implement -> independent review -> integrate** loop. It grew out of porting an Android app to iOS ticket by ticket with Claude Code: one worktree and one commit per ticket, reviews that check evidence rather than claims, and guardrails around anything outward-facing.
+**Let Claude Code agents build your project ticket by ticket, while you stay in charge.**
 
-**Nothing leaves your machine without your approval.** By default the guard hook asks you before every `git push`, `gh pr create/merge`, `gh repo create/delete`, `gh release create`, deploy and destructive cloud command. Agents never push; you do. See [Push policy](#push-policy-pushpolicy).
+AI coding agents are fast. But they say "done" without proof, they review their own work, they wander outside the task, and sometimes they push code or delete things you never meant them to touch.
 
-## Install
+dev-harness is a Claude Code plugin that gives agents a workflow and guardrails. It is for solo developers and small teams who run multi-week projects with Claude Code. It grew out of porting a production Android app to iOS, one ticket at a time.
+
+- **One ticket, one agent, one commit.** Each task has a written scope, done criteria and a list of files it may touch. An implementer agent works in its own git worktree, so parallel work does not collide.
+- **Independent review that checks evidence.** A separate reviewer reruns the tests and reads the diff. It does not trust the implementer's report. Risky changes get a stronger model and a stricter reviewer.
+- **Risky actions ask first.** Pushes, pull requests and deploys ask for your approval. Reads of known credential files are blocked. An edit that adds a test skip or a lint suppression asks first.
+- **A ticket board for plain Markdown tickets.** Tickets stay as files in your repo. The board is one HTML page that works offline.
+
+These guards are best-effort. They match command text, so indirect forms (scripts, variables) can get through. They are guardrails, not a sandbox: Claude Code permission deny rules are the hard boundary. See [Limits](#limits).
+
+![The ticket board, light theme](docs/images/board-light.png)
+
+## Getting started
+
+### Prerequisites
+
+Claude Code, git, Python 3.9 or newer and `/bin/sh`. macOS is the main target. Linux should work (not tested there); desktop notifications are macOS only. The plugin has no other dependencies.
+
+### Install
 
 Inside Claude Code:
 
@@ -20,162 +37,152 @@ claude plugin marketplace add d85275/claude-harness
 claude plugin install dev-harness@dev-harness
 ```
 
-Restart running Claude Code sessions to pick up the agents, commands, and hooks. For local development, add the marketplace from a path instead: `claude plugin marketplace add ~/Projects/claude-harness`.
+Restart running Claude Code sessions to pick up the agents, commands and hooks.
 
-Then add a `## Harness` section to the project's `CLAUDE.md` (template: [`templates/CLAUDE-harness-section.md`](templates/CLAUDE-harness-section.md)) and, optionally, `.claude/harness.json` for project-specific hook rules ([`templates/harness.json`](templates/harness.json)).
+### What this installs and changes
+
+- **Guards.** The guard hooks run on every Bash, Read, Edit and Write call in every project where the plugin is enabled, not only after `/ticket-init`.
+- **`/ticket-init`.** It writes only after showing you the file list. It creates the ticket template, the tracker, `docs/STATUS.md` and the board. It adds a `## Harness` section to `CLAUDE.md` (appended; an existing Harness section is never edited) and adds missing `tickets` keys to `.claude/harness.json`. It commits nothing.
+- **Git hooks (optional).** `dev-harness-board install-hooks` makes git rebuild the board after commits and checkouts, in your clone only. To remove them, run `dev-harness-board uninstall-hooks` before you uninstall the plugin, or later `git config --unset core.hooksPath`. If the plugin is gone and the hooks are still set, they only print one line that the board was not rebuilt, and git carries on. `dev-harness-board` is on the PATH of Claude Code's Bash tool while the plugin is enabled; in an ordinary terminal, run it by its path (`python3 <plugin folder>/bin/dev-harness-board`). Details, including Git LFS, are in [docs/configuration.md](docs/configuration.md#board-git-hooks).
+
+## Words used here
+
+- **Owner**: you. **Coordinator**: your main Claude Code session, which plans, starts agents and judges reviews.
+- **Worktree**: a second checkout of your repo, in its own folder and branch, where one agent works.
+- **Ticket**: a Markdown file for one task. **Tracker**: the table with one row per ticket; its State column is the source of truth.
+- **Review level**: `standard` (reviewer), `high-risk` (stronger implementer and reviewer) or `self-review` (trivial docs or test changes the coordinator checks itself).
+- **State**: Planned, In progress, In review, Fixing (the implementer is amending after review), Owner check (done, waiting for you to confirm), Done, Blocked, Deferred.
+- **Guard**: a hook that checks each tool call and asks, blocks or allows it. **Evidence**: the real commands and results an implementer records, which the reviewer reruns.
+- **Twin**: the same ticket on a mirrored platform, such as iOS and Android.
+- **Handoff docs**: your notes on the current state and the next step (for example `docs/STATUS.md`). **Drift**: when those docs say one thing and the repository another.
+
+## Five-minute quickstart
+
+Commands are written `/plan` here. If another command has the same name, use the full form, `/dev-harness:plan`.
+
+1. **Set up.** In your project, run `/ticket-init`. It asks: the ticket ID prefix (such as `WEB`), the main branch, whether to archive closed tickets, twin platforms (leave off unless the same feature ships as separate tickets for each platform), and whether to install the git hooks that rebuild the board (you can say no). Then say yes to the file list.
+2. **Fill in the `## Harness` section** of `CLAUDE.md`, replacing the `<...>` placeholders. Agents read it. For example (in the commit format line, `<type>` and the others are literal; keep them as written):
+
+   ```markdown
+   - **Verify**: focused `npm test -- <file>`; full `npm test`; static `npm run lint`.
+   - **Commit format**: `<type>: <id-lowercase> <summary>`.
+   - **High-risk categories**: login and accounts, payments, deleting data, release.
+   - **Build caches**: none to clean up.
+   ```
+
+3. **Ignore the generated board.** `docs/tickets/board.html` is generated. Add it to `.gitignore`; otherwise the guard asks before you commit it. (`/ticket-init` reminds you.)
+4. **Plan a ticket.** Run `/plan Make search ignore accents`. The coordinator reads your code, drafts a contract (scope, done criteria, allowed files, review level) and proposes a ticket ID such as `WEB-1`. When you approve, it writes `docs/tickets/WEB-1.md` and a Planned row in `docs/tickets/tracker.md`. Commit those files, together with the files from steps 1 to 3 (`CLAUDE.md`, `.claude/harness.json`, the tracker, the template, `docs/STATUS.md` and `.gitignore`).
+5. **Implement.** Run `/start-ticket WEB-1`. The implementer works in the background in `.worktrees/web-1`. If it hits a guard prompt (a push, say), the prompt should appear in your Claude Code session and the agent waits for your answer. Claude Code tells you when it finishes, and the coordinator summarises its report. The board shows the ticket as In progress once it is rebuilt (run `dev-harness-board`, or use the git hooks).
+6. **Review.** Run `/review WEB-1`. If the reviewer answers "changes required", the coordinator sends the findings back to the same implementer, which amends its commit; the coordinator then starts the next round itself, so you do not run `/review` again. After three rounds, the coordinator asks you to decide.
+7. **Close.** Run `/close-ticket WEB-1`. It puts the commit on `main`, reruns the checks, marks the ticket Done in a separate docs commit, and removes the worktree.
+8. **Look and push.** Open `docs/tickets/board.html` in a browser (`/close-ticket` rebuilds it; so do the optional git hooks). Push `main` yourself when you are ready.
 
 ## The loop
 
-| Step | Command / agent | Gate |
-|---|---|---|
-| Plan | `/plan <intent>` | Owner approves scope, done-criteria, allowed files, stop conditions. Skip when a spec already defines the ticket. |
-| Implement | `/start-ticket <id>` -> `implementer` (Sonnet), or `implementer-advanced` (Opus) when the ticket's Review level is `high-risk` | Own worktree, one commit, fresh evidence, nothing outward-facing. |
-| Review | `/review <id>` -> `reviewer` (Sonnet) or `high-risk-reviewer` (Opus, or Fable via `highRiskReviewerModel`), plus `silent-failure-hunter` for error/offline/recovery work | Reviewer verifies evidence itself; fixes loop back to the implementer; max 3 rounds, then the owner decides. |
-| Integrate | `/close-ticket <id>` | Cherry-pick, integrated check, remove worktree/branch/caches/test devices. Never pushes. |
-| Check drift | `/sync` | Plan and handoff docs vs. what is actually on the integration branch. |
+Every feature goes through four steps: plan, implement, review, integrate. You approve the plan at the start and you push at the end.
 
-Model choice is deliberate, by alias only (never a pinned version), and there is no Haiku tier: routine implementation and review run on Sonnet; Opus is used where a missed bug costs the most.
+```mermaid
+flowchart TD
+    subgraph Owner["You (owner)"]
+        O1["Describe the feature"]
+        O2{"Approve the plan?"}
+        O3["Decide escalated questions"]
+        O4["Push main when ready"]
+    end
 
-| Agent | Model / effort |
-|---|---|
-| `implementer` | Sonnet / medium |
-| `implementer-advanced` | Opus / high |
-| `reviewer`, `silent-failure-hunter` | Sonnet / high |
-| `high-risk-reviewer` | Opus / high; Fable when `highRiskReviewerModel` is `"fable"` |
+    subgraph Coord["Coordinator (your main session, Opus recommended)"]
+        C1["/plan: write the task contract<br/>scope, done criteria, allowed files, review level"]
+        C2["/start-ticket: pick the implementer<br/>from the review level"]
+        C3["/review: pick reviewers<br/>from the diff, not the report"]
+        C4{"Verdict"}
+        C5["/close-ticket: cherry-pick onto main,<br/>rerun the checks, clean up"]
+    end
 
-**Upgrade rule.** An implementer that finds its diff riskier than planned says so in its report. The coordinator then sets the ticket to `high-risk`, so review always goes to `high-risk-reviewer`. Whether to redo the implementation with `implementer-advanced` is the owner's call. `/plan` marks a ticket `high-risk` when unsure, with a one-line reason.
+    subgraph Impl["Implementer (Sonnet, or Opus for high-risk)"]
+        I1["Work in its own worktree<br/>.worktrees/id on feature/id"]
+        I2["Run the tests, record evidence"]
+        I3["Exactly one commit, then report"]
+    end
 
-## Agents
+    subgraph Rev["Reviewers (read-only)"]
+        R1["Reviewer, or high-risk reviewer<br/>reruns tests, reads the diff"]
+        R2["Silent-failure hunter<br/>for error-handling changes"]
+    end
 
-- **implementer** - one ticket, one worktree, one commit; reports verified vs. not-run vs. not-possible.
-- **implementer-advanced** - same rules, for `high-risk` tickets; Opus, with extra care for guards, credentials, git hooks and release.
-- **reviewer** - read-only; does not trust the implementer's report; judges only against the ticket's criteria.
-- **high-risk-reviewer** - read-only senior review for identity, payments, deletion, security, shared contracts, release.
-- **silent-failure-hunter** - read-only second lens for swallowed errors, catch-all fallbacks, and "unknown" collapsed into a definite answer.
+    Guard[["Guard hooks check every Bash, Read, Edit and Write call<br/>push, deploy and credential reads ask or block"]]
 
-## Hooks (`hooks/scripts/`)
+    O1 --> C1 --> O2
+    O2 -- "changes" --> C1
+    O2 -- "yes" --> C2 --> I1 --> I2 --> I3 --> C3
+    C3 --> R1 & R2
+    R1 & R2 --> C4
+    C4 -- "changes required" --> I1
+    C4 -- "round limit reached" --> O3 --> C2
+    C4 -- "accept" --> C5 --> O4
 
-| Hook | Behavior |
-|---|---|
-| Bash: credential reads | Blocks `cat`/`cp`/`grep`/... on keys, keystores, `.p8`, service-account JSON, `.env`, SSH private keys (`id_rsa`, `id_dsa`, `id_ecdsa`, `id_ed25519` and the `-sk` variants, in any folder; the `.pub` files pass) (plus `protectedPaths`). Shell punctuation glued to a word (`$(cat .env)`, a backtick read, `{ cat .env; }`) is ignored when matching. A path that appears only in the body of a plain-data heredoc (the same rule as for protected configs below: `cat > file`, `cat >> file`, `tee file`, `git commit -F -`, `git tag -F -`, quoted delimiter or no `$`/backtick in the body, nothing piped onward, the file not named again later) is text being written, not a read, and passes; a path anywhere else in the same command still blocks, at any size. Nothing is exempt over 256 KB, or when the command has a carriage return, a `#` or `${` outside the bodies, an `alias`, a `cat`/`tee`/`git` function, a `PATH=` or `hash` change, `mkfifo` or an `exec` redirect, or a heredoc writing under `/dev/` or `/proc/`. A file written this way and then run is caught only when the same command names the file again (`sh run.sh`); a later command, or an indirect runner (`make`, a glob such as `sh *.sh`, a dotfile that a shell sources, a git hook) is not seen. Known gaps: interpreter heredocs (`python3 - <<'EOF'`, `node - <<'EOF'`) that only mention a credential path stay blocked, so write such test text with the Write/Edit tools; a read inside `$(...)` in double quotes (`echo "$(cat .env)"`) is one shell word and is not matched. |
-| Bash: publishing | `git push`, `gh pr create/merge`, `gh repo create/delete`, `gh release create`, `gh gist create` (and gh's `new` aliases): asks the owner, blocks, or leaves it to your permission rules, per [`pushPolicy`](#push-policy-pushpolicy) (default: ask). |
-| Bash: deploys and destructive cloud commands | Always asks before `firebase deploy` and other destructive Firebase/gcloud/terraform/kubectl commands (plus `askCommands`), whatever `pushPolicy` says. |
-| Bash: git stash and `core.hooksPath` | Asks before a `git stash` that changes the stash or the working tree (bare, `push`, `save`, `pop`, `apply`, `drop`, `clear`, ...) when the repo has more than one worktree, because every worktree shares one stash and another agent could pop it (`git -C <dir>` counts `<dir>`'s repo; `list` and `show` always pass). It runs `git worktree list --porcelain` (2 s timeout) only then; if git cannot count, it asks ("could not count worktrees"). Also asks before `git config core.hooksPath ...` (any scope, `--unset`, `--unset-all`, any letter case) and `git -c core.hooksPath=... <cmd>`, since the setting replaces `.git/hooks` and silently disables hooks such as Git LFS's pre-push; reads (`--get`, `--list`, the key alone) pass. Known gaps: git aliases, commands built from variables, scripts, editing `.git/config` directly, and a `cd` into another repo before the stash (the worktree count is taken where the command starts; `git -C` is followed). |
-| Bash and Edit/Write: the board's git hooks | Asks, under every `pushPolicy`, before `dev-harness-board install-hooks` or `uninstall-hooks` (any path to the command, `python3 .../dev-harness-board`, after `&&`, `;`, `env`, `command`, in `bash -c` text), because they change `core.hooksPath` in their own `git config` call, which the rule above cannot see. `--check` (and `--json`, or no subcommand) passes. Also asks before Edit/Write, or a shell write (redirect, `cp`, `mv`, `rm`, `sed -i`, `tee`, `chmod`, ...), on a path ending `dev-harness/hooks/<file>` (the untracked folder `<git dir>/dev-harness/hooks`); reading it passes. Shell writes are matched for the folder itself and the files directly in it; Edit/Write ask at any depth below it. A command's quote or shell punctuation glued to the words (`` `dev-harness-board install-hooks` ``, `$(...)`, `{...}`) is stripped, which also makes `` `git config --unset core.hooksPath` `` and `$(git config --unset core.hooksPath)` ask. The folder is matched by path shape, not by asking git, so nothing runs and it cannot time out; a path like `x/dev-harness/hooks/y` outside a git dir asks too (a harmless extra prompt): a checkout whose own path contains `dev-harness/hooks/`, such as the plugin's own repo, gets an extra Edit prompt for files under it. Known gaps: a symlink into the folder, a `cd` into it followed by a relative write, commands built from variables. |
-| Bash: commits of generated files | Asks before a `git commit` (also `-am`, `--all`, `git -C <dir> commit`, chained after other commands, inside `sh -c`) when it would add files that look generated: anything under `node_modules/`, `build/`, `dist/`, `.gradle/`, `DerivedData/`, `__pycache__/` or `.worktrees/`, `*.pyc`, `*.class`, `*.o`, the configured board output (`tickets.boardPath`), or a file `.gitignore` would ignore (force-added; `git check-ignore --no-index`). Folder names match at any depth (`app/build/x` asks). The prompt lists up to 10 paths. Only newly added files count: modifications, deletions and `git commit --amend --no-edit` with nothing new pass. It runs `git rev-parse`, `git diff --cached --no-renames --name-only --diff-filter=A` (so a rename or copy into `dist/` counts as an add) and `git check-ignore` (one shared 3 s deadline) only when a commit is detected, in the repo the commit targets (`git -C` is followed). If git fails or times out, hits already found still ask, and a warning ("could not check staged files: ...") is shown; with no hits the call is allowed with that warning, never silently. Each `git -C` folder is checked separately (the first 4; the rest are reported as not checked). A commit after a `cd`, or with `--git-dir`, `--work-tree`, `GIT_DIR=` or `GIT_WORK_TREE=`, is not checked and says so in a warning. If an earlier rule in the same command already asks (push, stash, `core.hooksPath`, protected config), the commit's files are not checked separately. Known gaps: `git add -A && git commit` in one command (the hook runs before the add, so it sees only what was staged earlier), and commits made through aliases, scripts or other tools. |
-| Bash: writes to protected configs | Asks when a command looks like it writes to, moves, copies over, deletes or changes the mode of a protected config (`.claude/harness.json`, `.claude/settings*.json`, lint/test configs, `protectedConfigs`): redirections (`>`, `>>`, `>|`, `&>`), `tee`, `sed -i`/`perl -i`/`ruby -i`/`gawk -i inplace`, `cp`/`mv`/`install`/`ln`/`rsync`/`dd of=`/`truncate`/`rm`/`chmod`/`chown`/`touch`/`unzip`, editors (`vim`, `ed`, ...), `git checkout/restore` of the working tree, `sh -c`/`bash -c`/`eval` bodies and shell heredocs, and interpreter code (`python -c`, `node -e`, `ruby -e`, `perl -e`, `python3 - <<EOF`) that names the path. It also counts the config's folder (`rm -rf .claude`, `cp x .claude/`), globs (`.claude/*.json`) a recursive copy into a folder that holds one (`cp -R src/. .`), `git update-index --assume-unchanged`/`--skip-worktree`, and a `cd`/`git -C` earlier in the same command; on macOS, any letter case. Heredoc bodies are checked as commands, except plain data: the body of `git commit -F -`, `git tag -F -`, `cat > file`, `cat >> file` or `tee file`, with a quoted delimiter (or no `$`/backtick in the body), found closed, on a line that pipes nothing onward, and (for `cat`/`tee`) writing a file the rest of the command does not name again, so a script written and then run is checked. Before the word checks, `#` comments are removed on lines without `$(`, backticks or `((`; the scanner can misread quotes nested inside `${...}` or a multi-line `$(...)` and remove too much. No heredoc body is exempt, for push and config writes alike, when the command has a carriage return, a `#` or `${` outside the bodies, an `alias`, a `cat`/`tee`/`git` function, a `PATH=` or `hash` change, `mkfifo` or an `exec` redirect, or a heredoc writing under `/dev/` or `/proc/` (the same conditions as in the credential row): every push and config match counts. A protected-config write hidden by a `#` that the scanner misreads inside `${...}` is therefore still caught when a data heredoc is present; without one, the `#` comment removal above can still hide it (`echo "${x:-"a # b"}"; rm .claude/settings.json`, a known gap). Reads pass: `cat`, `grep`, `jq`, `git diff`, `git restore --staged`, `python3 -m json.tool`, test runners given `--config`. Interpreter code that names a config asks even when it only reads it. This catches common shell writes, not all of them: paths built from variables, scripts, `tar`, `patch`, `git apply`, `git stash pop` in a repo with a single worktree (with several, every stash asks; see the row above), formatters such as `prettier --write`, and other indirect paths get through. |
-| Bash: machine-wide device resets | Preset rules (see [Device presets](#device-presets)): block `simctl shutdown all`, `simctl delete/erase all`, `killall Simulator/xcodebuild` (preset `apple-simulators`) and `adb emu kill`, `killall qemu-system*` (preset `android-emulators`) while another `xcodebuild` / `gradlew` run is active, so parallel agents do not kill each other's devices. Such a command written as text in a plain-data heredoc body passes, under the same conditions as in the credential row; in `cat <<'EOF' | sh`, `bash <<'EOF'`, or a script written and then named again in the same command (`sh run.sh`), it is still caught. Indirect runners (`make`, globs, dotfiles, git hooks) are a known gap, as in the credential row. Backslash-newline continuations are joined in the command itself (`simctl \` + `shutdown all`), but not inside a body that a shell runs (`bash <<'EOF'`, `sh -c '...'`): a reset split that way is not caught (an older gap). |
-| Read: credentials | Blocks reading protected credential files. |
-| Edit/Write: protected configs | Asks before editing lint/format configs, test plans/runner configs, `.claude` settings, and `protectedConfigs` (e.g. validator thresholds), so agents fix code instead of weakening checks. |
-| Edit/Write: weakened checks | Asks when an edit *adds* a test skip, accessibility-audit filter, or lint/type suppression (`XCTSkip`, `@skip`, `it.skip`, `@Ignore`, `@Suppress`, `# noqa`, `@ts-ignore`, `eslint-disable`, `--no-verify`, ...; extend with `weakeningMarkers`, turn off with `"checkWeakening": false`). Moving or removing an existing one is allowed. |
-| Notification | macOS desktop notification when Claude needs you (`"notify": false` to turn off). |
-
-Hooks are best-effort guardrails, not a sandbox. Claude Code permission deny rules are the hard boundary; keep them for anything that must never happen. A Bash command too large to check (over the check's work budget, a single word over 32 KB, or over 256 KB in all) asks: "command too large to check; approve manually". A check that fails with an error asks too.
-
-Tests: `python3 -m unittest discover -s tests`.
-
-## Device presets
-
-The machine-wide device-reset blocks are two presets. Each blocks its commands only while another build of its kind is running (per-device commands such as `simctl delete <UDID>` always pass).
-
-- `apple-simulators`: `simctl shutdown all`, `simctl delete|erase all` (also with `--set <path>`), `killall Simulator|xcodebuild`; busy check on `xcodebuild`.
-- `android-emulators`: `adb emu kill`, `killall qemu-system*`; busy check on `gradlew`.
-
-A preset switches on automatically when a project root (the `CLAUDE_PROJECT_DIR` or repo root, so a worktree counts) or one of its direct subfolders holds an `*.xcodeproj` / `*.xcworkspace` (apple) or a `gradlew` (android). Detection only runs when a reset command is seen and lists just those folders (no deep walk; dot folders and `node_modules` are skipped). If a folder cannot be listed the preset counts as on and a warning is shown. Force a preset on with `"presets": ["apple-simulators"]` or off with `"disabledPresets": ["android-emulators"]` in `harness.json`. Without a mobile project and without the key, the rules are off. Deploy and destructive cloud commands (Firebase, gcloud, terraform, kubectl) stay default asks.
-
-## Configuration (`.claude/harness.json`)
-
-Every key is optional; a missing file means all defaults. Config files are merged, never overridden. The sources are `$CLAUDE_PROJECT_DIR/.claude/harness.json` (when present) and the nearest `.claude/harness.json` found walking up from the working directory, stopping at the repository root (first folder containing `.git`, a folder or a worktree file; without one, at `$CLAUDE_PROJECT_DIR` if inside it, else only the working directory). Without `CLAUDE_PROJECT_DIR`, every file up to the repository root counts. A file above the repository root is never loaded; the hook only warns that it exists. Each file loads on its own, so a broken one is reported (an unreadable file counts as present, not missing) while the others still apply. The result is never weaker than any single file: lists (`protectedPaths`, `protectedConfigs`, `askCommands`, `weakeningMarkers`) are unioned, `presets` and `disabledPresets` are unioned too (a nested file can switch a preset on but never off for the root; an explicit on beats an off from a different file, and within one file off wins), `pushPolicy` takes the strictest (`deny` > `ask` > `allow`), `checkWeakening` is on if any file says so, and the remaining keys take the root file's value, falling back to a nested file. So a stricter worktree config applies immediately, and a weaker one changes nothing. Identical copies produce no notice; differing ones produce one notice naming both files. Project globs match relative to each file's project folder as well as to the working directory.
-
-A malformed file, an unknown key, a bad regex or a value of the wrong type is never ignored silently. The hook still enforces the built-in rules, falls back to the default for the bad part (for the lists `protectedPaths`, `protectedConfigs`, `askCommands` and `weakeningMarkers` it keeps the valid entries and a bare string counts as a one-item list), and reports the problem three ways: on stderr, as `systemMessage` for the user, and as `additionalContext` for Claude (on a permission prompt it is also appended to the reason; on a block it is appended to the message). The warning says which project protections are not active. Combining `systemMessage` with `hookSpecificOutput` in one object is not shown in the Claude Code hooks docs; verify with `claude --debug`. Example with every key: [`templates/harness.json`](templates/harness.json). The shared loader is `hooks/scripts/harness_config.py`. A key repeated in one file is reported too (the last value is used). The `systemMessage` and `additionalContext` copy is shown once per session and config state (a marker file under the system temp folder, keyed by the problems, the files' mtimes and the session id). The marker is written only after output carrying the warning was printed, so a block or a desktop notification does not use it up. stderr still has it on every call. With no usable session id, or a marker folder that cannot be written or trusted (a file or symlink in its place, another owner), the warning is shown on every call.
-
-Other cases the guard reports instead of allowing silently: hook input that cannot be read (warning, call unchecked); a guard module that cannot be imported (asks for Bash, Read and Edit with "dev-harness guard could not load"); a crash inside the Bash or Read guard (allowed with a warning, but asks when the command or path looks like a credential file); a Bash command over 262144 characters (the credential pass still runs on plain whitespace-split words and a credential hit still blocks; with no hit, or when its 4 s deadline runs out, it asks "too large to check"); `pgrep` missing, timed out or failing when a machine-wide device reset is seen (asks); and a failing desktop notification (reported once per session).
-
-| Key | Default | Meaning |
-|---|---|---|
-| `version` | `1` | Schema version; only `1` exists. |
-| `protectedPaths` | `[]` | Extra globs the guard treats as credentials. |
-| `protectedConfigs` | `[]` | Extra globs whose edits need the owner's OK. |
-| `askCommands` | `[]` | Extra command substrings that need the owner's OK. |
-| `checkWeakening` | `true` | Ask when an edit adds a test skip or lint suppression. |
-| `weakeningMarkers` | `[]` | Extra regexes counted as weakening. |
-| `notify` | `true` | macOS notification when Claude needs you. |
-| `pushPolicy` | `"ask"` | `"ask"`, `"deny"` or `"allow"` for git push and GitHub publishing; see [Push policy](#push-policy-pushpolicy). |
-| `presets` | `[]` | Force device presets on: `"apple-simulators"`, `"android-emulators"` (see [Device presets](#device-presets)). Unknown names are reported. |
-| `disabledPresets` | `[]` | Force device presets off. Within one file off wins; an "on" from another file beats it. |
-| `highRiskReviewerModel` | `"opus"` | `"opus"` or `"fable"`; `/review` passes it as the model of `high-risk-reviewer`. |
-| `tickets.dirs` | `["docs/tickets"]` | Folders holding ticket files. |
-| `tickets.featureGlobs` | `[]` | Globs mapping files to features. |
-| `tickets.idPrefixes` | `{}` | Ticket ID prefix -> `{"platform": ..., "kind": ...}`. |
-| `tickets.twinPlatforms` | `null` | List of platforms that mirror each other, or `null`. |
-| `tickets.archive` | `false` | Move closed tickets to an archive. |
-| `tickets.trackerPath` | `"docs/tickets/tracker.md"` | Tracker file. |
-| `tickets.integrationBranch` | `"main"` | Branch tickets are integrated onto. |
-| `tickets.boardPath` | `"docs/tickets/board.html"` | Generated board file. |
-
-## Push policy (`pushPolicy`)
-
-Nothing leaves your machine without your approval. `pushPolicy` decides how the guard treats git push and GitHub publishing: `git push` (in any form: `git -C dir push`, `git -c k=v push`, after `env`/`command`/`sudo`, chained with `&&`, `;`, `|` or in a subshell, split with `\`-newline), `gh pr create`, `gh pr merge`, `gh repo create`, `gh repo delete`, `gh release create` and `gh gist create`, including gh's `new` aliases and `-R`/`--repo` before the subcommand.
-
-| Value | Behavior |
-|---|---|
-| `"ask"` (default) | You approve each one at a permission prompt. Also used when no config exists or the value is invalid. |
-| `"deny"` | Blocked outright (exit 2). The message tells the agent the owner pushes by hand. |
-| `"allow"` | No prompt from this hook, as long as git confirms that no `harness.json` in the repository (and none of the loaded ones) differs from the last commit. A modified, staged, deleted, untracked or ignored `harness.json`, one marked assume-unchanged or skip-worktree in the index, or a git error (for example outside a git repository), still asks: "push policy file changed in the working tree". Your own Claude Code permission rules still apply. Meant for your own interactive sessions. The hook cannot tell a subagent from the main session, so `"allow"` applies to subagents too; agents are kept from pushing by their instructions and your permission rules, not by this hook. |
-
-`pushPolicy` covers only git/GitHub publishing. Deploys and destructive cloud commands (`firebase deploy`, `gcloud ... deploy/delete`, `terraform apply/destroy`, `kubectl apply/delete`) and every `askCommands` entry always ask, whatever the policy, including when chained onto an allowed push. When config files merge, the strictest value wins (`deny` > `ask` > `allow`).
-
-Turning on `"allow"` takes a change to `harness.json`. An Edit/Write of it asks, and so do the common shell writes to it (see the hooks table). Whatever shell form was used, a push under `"allow"` still asks until the change is committed, and a commit is something you see. Permission deny rules (for example on `Bash(git push:*)`) are the hard boundary.
-
-Detection matches text, so it errs towards asking: under `"deny"` a command that merely mentions `git push` in quotes (a commit message, a `grep`) is blocked too; reword it or run it yourself. Plain data heredocs (`git commit -F - <<'EOF'`, `cat > notes.md <<'EOF'`, as described in the hooks table, and only when none of the exemption-off conditions listed there holds) are not read as commands; every other heredoc body is, including one piped to a shell or interpreter. Not detected: shell variables, git aliases for push, scripts (`$G push`, `./release.sh`), `gh api` calls, `git lfs push`, `git subtree push` and `git send-pack`; add such scripts to `askCommands` and keep a permission deny rule.
-
-## Layout
-
-```text
-.claude-plugin/   plugin.json, marketplace.json
-bin/              dev-harness-config, dev-harness-board (on the Bash PATH while the plugin is enabled)
-board/            ticket model, parser and checks behind dev-harness-board
-agents/           implementer, implementer-advanced, reviewer, high-risk-reviewer, silent-failure-hunter
-commands/         plan, ticket-init, start-ticket, review, close-ticket, sync
-hooks/            hooks.json and scripts/:
-                    guard.py           hook entry: input, ask/block, crash handler, Read/Edit/notify guards
-                    bash_rules.py      Bash rules: credential reads, push policy, always-ask
-                                       commands, device resets; runs shell_check
-                    shell_check.py     one pass over a command: push detection, config writes
-                    shell_scan.py      shell scanner (words, operators, heredocs, quoting) and work budget
-                    harness_config.py  harness.json schema, loading and merging
-templates/        CLAUDE.md Harness section, harness.json, ticket template, tracker and STATUS skeletons, githooks/hook.sh (board git hooks)
-tests/            guard (end to end), push policy, config writes, shell scanner, config loader,
-                  agent tier and dev-harness-config tests;
-                  tests/data/guard_corpus.txt: commands with the expected decision per policy
+    Guard -.-> Impl
+    Guard -.-> Coord
 ```
 
-`bin/dev-harness-config get <key>` prints one value of the merged config for the current directory (scalars plainly, lists and objects as JSON). Config warnings go to stderr with exit 1 (the value is still printed); an unknown key or bad usage exits 2. Commands use it because `CLAUDE_PLUGIN_ROOT` is not set in the Bash tool's environment.
+| Step | Command | Who does the work |
+|---|---|---|
+| Plan | `/plan <intent>` | The coordinator drafts the contract and, once you approve, writes the ticket file and tracker row. |
+| Implement | `/start-ticket <id>` | An implementer, in its own worktree. |
+| Review | `/review <id>` | A reviewer, or a high-risk reviewer. A silent-failure hunter joins for error-handling work. |
+| Integrate | `/close-ticket <id>` | The coordinator. It never pushes. |
+| Check drift | `/sync` | Compares your plan and handoff docs with the main branch. Read-only. |
 
-`bin/dev-harness-board --check [--root DIR]` reads the tracker and ticket files named by the `tickets` settings (`trackerPath`, `dirs`, `featureGlobs`, `idPrefixes`, `twinPlatforms`, `archive`, plus `stateAliases`, `archiveTracker`, `archiveDirs`, `extraColumns`, `titleColumn`) and prints one line per disagreement: a row and its file with different states, a row without a file (except a Done row or one in the archive tracker, which is old history and needs no ticket file) or a file without a row, an unknown state, a duplicate ID, a link to a missing file, a twin ticket missing. Exit 0 when clean, 1 when there are problems, 2 on bad usage or an unreadable config. `--json` prints the parsed model. It writes nothing, ignores live worktrees (it compares only the main checkout's row with its file) and runs no git for its result.
+Routine work runs on Sonnet; high-risk tickets and their reviews run on Opus. The agents, models and routing rules are in [docs/agents.md](docs/agents.md).
 
-`bin/dev-harness-board [--root DIR] [--out PATH]` (no mode flag) writes the board as one self-contained HTML file to `tickets.boardPath` (or `--out`), atomically. A `tickets.boardPath` that leads outside the checkout or into the git dir (absolute, `../`, through a symlink, `.GIT` on a case-insensitive disk) is refused with exit 2; `--out` names a file anywhere. The board has six columns (In review also holds Fixing; Blocked also holds Deferred), cards with kind icon, labels (an optional `## Labels` section in the ticket file), review badge, a mismatch badge for tickets `--check` reports, and `extraColumns` values; search and kind/platform/review/mismatch filters; an issue view per ticket (rendered Markdown, details, twin link, copy-link, `#<ID>` deep link); light/dark theme; phone layout. A card's title is the ticket file's `# <ID>: <title>` heading, else the tracker's title column. The column is `tickets.titleColumn` (header name, any case) when set; otherwise `Title`; otherwise the first of `Issue`, `Summary`, `Name`, `Subject` that is not listed in `extraColumns`. Markdown links in the cell show as their text (an image as its alt text), and the title column is not repeated as an extra. Changed behaviour: the ticket file's heading now wins over the tracker cell (it used to be the other way round). `--check` prints a `warning:` line on stderr, exit code unchanged, when `titleColumn` names a column the tracker lacks or one of ID, State, Review, Commit, Note. No network and no external assets. It reads the commit from `.git` without running git. Live worktrees: it runs read-only `git rev-parse --git-common-dir` and `git worktree list --porcelain` (5 s timeout each) and, for a worktree on `feature/<id-lowercase>` of a known ticket, shows the most advanced of main's state, In progress and the state in that worktree's own tracker row or ticket file (committed or not), capped at In review (Planned < In progress < Fixing < In review); Owner check, Done, Blocked and Deferred on main never move. The card shows "from feature/<id>". Prunable and missing worktrees are skipped; with no git, no repo or no worktrees the board builds from main alone. Run from a linked worktree it works on the main checkout and writes the board there. `--check` also prints a `warning:` line on stderr (exit code unchanged) when the board file is older than the tracker or a ticket file.
+## What a review round looks like
 
-### Board git hooks
+The quickstart ticket stops at "changes required". Here is that part, and the close, using `FIX-2` ("Search ignores accented letters") from the [example board](docs/examples/board.html).
 
-`bin/dev-harness-board set-state <ID> <State> [--commit SHA]` sets a ticket's state in one step: the State cell of its tracker row (and the Commit cell) and the leading state word(s) of the Status line in its ticket file, in the checkout it runs in (a linked worktree is not redirected to main). Everything else in both files is kept byte for byte (CRLF, BOM, column padding, links, the rest of the Status line); both edits are computed first and nothing is written if either fails; an unknown state or ticket, a missing Status line, one that does not start with a known state (nothing is replaced; write it by hand), a symlinked, read-only or non-regular target, or a bad commit id exits 1 before anything is written; if the second write still fails the first file is restored. `archive <ID>` (only for a Done ticket; needs `tickets.archive`, `archiveTracker`, `archiveDirs`) moves the row into the archive tracker's table and the file into `archiveDirs[0]` and fixes relative links to it (trackers, ticket files, and the moved file's own links). `twin <ID>` (needs `twinPlatforms`) prints whether the twin ticket is open; it changes nothing. The commands use them: `/start-ticket` sets In progress in the new worktree (uncommitted; the implementer's one commit carries it; it refuses Done/Blocked/Deferred tickets unless the owner says so), `/review` sets In review and, on CHANGES REQUIRED, Fixing (the implementer amends its single commit and sets In review again), `/close-ticket` sets Done with the SHA on the integration branch, reports the twin, archives when on, runs `dev-harness-board` then `--check` (output stops the close) and makes one docs close commit; `/sync` runs `--check` and adds a release check listing open Planned and Owner check tickets. No command pushes.
+1. **Review.** The reviewer reruns the tests and reads the diff. It finds that search now also matches inside ingredient notes and answers "changes required". The ticket moves to Fixing.
+2. **Fix.** The same implementer narrows the search to titles and ingredients and amends its one commit. Round two passes.
+3. **Close.** The coordinator cherry-picks the commit onto `main`, reruns the checks, marks the ticket Done with the commit ID, and removes the worktree and branch.
+4. **Push.** You push `main` yourself. Every `git push` asks by default, so nothing goes out by accident.
 
-`/ticket-init` (command) sets up tickets in a project that has none: it asks for the ID prefix, integration branch, archive, twin platforms and whether to install the hooks, then runs `bin/dev-harness-board init --prefix PREFIX[:platform[:kind]] [--branch B] [--archive] [--twin-platforms a,b] [--dry-run] [--root DIR]`. `init` writes only files that do not exist: `<dirs[0]>/TEMPLATE.md`, the tracker (States line, empty table), `docs/STATUS.md`, `.claude/harness.json` and the Harness section of `CLAUDE.md` (with a "how tickets work" part and the rule that ticket-flow changes go to the plugin as a request). An existing `harness.json` gets only its missing `tickets` keys added (present keys never change, differing ones are reported as kept; the file is rewritten with 2-space indent; a file that is a symlink, read-only, unreadable, has a repeated key or holds NaN is left alone and the section is printed; a symlinked or read-only `CLAUDE.md` likewise); an existing `CLAUDE.md` Harness section is never edited, the missing lines are printed. A tracker or ticket folder that `init` did not make (no `TEMPLATE.md` beside the tracker) (and is not the empty tracker `init` writes) stops it with a message that adopting existing trackers is not available yet, and nothing is written. It builds the board once, commits nothing and does not install hooks (it prints `dev-harness-board install-hooks` as the next step, which the guard asks about). `--dry-run` lists what it would write and writes nothing. A CRLF `CLAUDE.md` is appended to with CRLF. If a write fails it says what was written ("partially done"); fixing the cause and re-running completes it. Running it again changes nothing and says so.
+## What the guards stop
 
-`bin/dev-harness-board install-hooks [--check]` makes git rebuild the board by itself, in this clone only. It writes hook scripts (copies of [`templates/githooks/hook.sh`](templates/githooks/hook.sh)) into an untracked folder inside the git common dir, `.git/dev-harness/hooks`, for `post-checkout` (runs on `git worktree add` and switches), `post-commit`, `post-merge`, `post-rewrite` (amend, rebase) and `pre-push`, plus one for every other executable hook already in `.git/hooks`, and sets the repository's own `core.hooksPath` to that folder's absolute path. Nothing is committed: each clone opts in by running it, every worktree and every branch (also one made before the install) uses the same scripts, and no branch's tracked files can change them. Run from a worktree, it works on the main checkout's repository.
+Guard hooks check every Bash, Read and Edit/Write call. They ask you, block the call, or let it through.
 
-It refuses (exit 1, nothing changed) when `core.hooksPath` already points anywhere else, in any scope (a global value counts as foreign unless it is exactly this folder), and says what to do; when the folder holds anything it did not write, or a symlink; and when the folder or a folder on the way to it is a symlink. `--check` prints what it would do and writes nothing. If the repository moved, `core.hooksPath` still names the old folder and git runs no hooks at all, Git LFS included: `install-hooks --check` and `dev-harness-board --check` warn about it on stderr, and running `install-hooks` again repairs it. `uninstall-hooks [--check]` unsets `core.hooksPath` only when the repository's own config points it at this folder (or at a dev-harness folder that no longer exists), and leaves the scripts, unused. Neither touches `.git/hooks` or global/system config. The guard asks before shell commands that change `core.hooksPath` and before `install-hooks` / `uninstall-hooks` themselves (not `--check`), and before edits to the hooks folder.
+| What an agent tries | What happens |
+|---|---|
+| `git push`, `gh pr create` or `merge`, `gh repo create` or `delete`, `gh release create`, `gh gist create` | Asks you. Set `pushPolicy` in [`.claude/harness.json`](docs/configuration.md#keys) to `"deny"` to block them. |
+| `firebase deploy`, destructive `gcloud`, `terraform`, `kubectl` commands | Always asks. |
+| Reading private keys, keystores, `.env` files, service-account JSON, SSH private keys | Blocked. |
+| Writing to lint, test or `.claude` settings, or to files you list as protected | Asks. |
+| Editing a file to add a test skip or a lint suppression (`it.skip`, `@Ignore`, `# noqa`, ...) | Asks. |
+| Committing generated files (`node_modules/`, `build/`, `dist/`, the board output, ignored files) | Asks. |
+| `git stash` while several worktrees exist | Asks, because every worktree shares one stash. |
+| Changing `core.hooksPath` or installing the board's git hooks | Asks. |
+| Resetting every simulator or emulator while another build is running | Blocked. |
 
-What each script does:
+Each rule, how it matches and what it misses: [docs/guards.md](docs/guards.md).
 
-- **Chains first.** Setting `core.hooksPath` stops git from running `.git/hooks`, so each script first runs `.git/hooks/<same name>` (for example Git LFS's `post-checkout`, `post-commit`, `post-merge`, `pre-push`) when it exists and is executable, with the same arguments and stdin, and exits with that hook's exit code (a failing `pre-push` still stops the push). A hook added to `.git/hooks` later needs `install-hooks` again before it runs. While that hook runs, `DEV_HARNESS_HOOK_ACTIVE` names it (the repository's common dir plus the hook name); a script that finds its own repository and name there does nothing, so a `.git/hooks` wrapper that hands back to the hooks folder cannot loop. A git command run inside that hook skips the same-named hook of the same repository too; another repository's hooks still run (a `pre-push` that pushes a second repository).
-- **Rebuilds only when needed.** `dev-harness-board hook <name> <args>` rebuilds the board in the main checkout when the commit (a merge commit counts against each parent), merge, rewrite or branch switch changed the tracker, a ticket file or `.claude/harness.json`, when a worktree was added, or when it cannot tell. During a rebase, `post-commit` waits and `post-rewrite` rebuilds once at the end. A `tickets.boardPath` that leads outside the checkout or into the git dir (absolute, `../`, through a symlink, `.GIT` on a case-insensitive disk, a git dir kept in the tree under another name) is refused: the hook prints one line and exits 0.
-- **Never fails the git command.** The rebuild cannot change the exit code, prints at most one line on stderr (`dev-harness: ...`), and is stopped after `DEV_HARNESS_HOOK_TIMEOUT` seconds (default 5; TERM, then KILL a second later). Temp files are removed on exit and on HUP, INT and TERM.
-- **Finding `dev-harness-board`.** The plugin lives in a different place on each machine, so the scripts name no path. They look for `$DEV_HARNESS_BOARD` (a path, or `off` to skip quietly), then `dev-harness-board` on `PATH` (it is there inside Claude Code), then the `dev-harness` entry in Claude Code's plugin list (`${CLAUDE_CONFIG_DIR:-~/.claude}/plugins/installed_plugins.json`). Without the plugin, each of those hooks prints one line, `dev-harness: board not rebuilt: dev-harness-board not found ...`, and the git command goes on as normal (set `DEV_HARNESS_BOARD=off` to silence it).
+## The ticket board
 
-**Git LFS.** `git lfs install` writes into `core.hooksPath`, so after `install-hooks` it would find our scripts there: it refuses to replace them (or, with `--force`, replaces them, and `install-hooks` then refuses the folder). To add LFS later, run `dev-harness-board uninstall-hooks`, then `git lfs install` (it writes into `.git/hooks`), then `dev-harness-board install-hooks` (its scripts chain to the LFS hooks). If `--force` already replaced scripts, delete the files `install-hooks` names from `.git/dev-harness/hooks` first.
+`dev-harness-board` turns your tickets into one HTML page: six columns, search and filters, a view for each ticket, light and dark themes and a phone layout. It needs no network. A card carries a review badge and a red "mismatch" badge when its tracker row and its ticket file disagree (`dev-harness-board --check` lists them all).
 
-The scripts need `/bin/sh` and `python3`.
+![The ticket board, dark theme](docs/images/board-dark.png)
+
+![A ticket opened in the issue view](docs/images/issue-view.png)
+
+Open the working example: [docs/examples/board.html](docs/examples/board.html), built from the made-up project in [examples/sample-project](examples/sample-project). The board commands and settings are in [docs/configuration.md](docs/configuration.md#the-ticket-board-commands).
+
+## Limits
+
+- **Every push asks unless you set `pushPolicy: "allow"`.** Agents cannot push a feature branch without a prompt, and no setting allows feature-branch pushes only. `"allow"` removes this hook's prompt for every push, subagents included. Allowing feature-branch pushes is planned after 1.0.
+- **Existing trackers cannot be adopted yet.** `/ticket-init` sets up new projects only. If your project already has a ticket tracker or a `docs/tickets/` folder, it stops and writes nothing. Adopting one is planned after 1.0.
+- **The guards miss indirect forms.** Scripts, aliases and commands built from variables can get through. The known gaps of each rule are in [docs/guards.md](docs/guards.md).
+- **Claude Code and macOS first.** The device-reset guards cover Xcode simulators and Android emulators.
+
+## More
+
+- [docs/guards.md](docs/guards.md): every guard rule, what it matches, and its known gaps.
+- [docs/configuration.md](docs/configuration.md): every `harness.json` key, how config files merge, and the board commands.
+- [docs/agents.md](docs/agents.md): the agents, models and routing.
 
 ## Credits
 
