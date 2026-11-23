@@ -56,6 +56,7 @@ CH-01 is done (c2efe7d). CH-02 is done (ef867a1). CH-03 is done (b999c7d). CH-08
 - 2026-11-22: deploy commands always ask, whatever `pushPolicy` says (CH-03).
 - 2026-11-23: once a project has switched to the plugin's ticket system, ticket-flow changes (states, start/review/close steps, board, git hooks, guards) go through this plugin; projects keep only their settings.
 - 2026-11-23: CH-10 (heredoc text is data) runs before CH-09.
+- 2026-11-23: guard tickets (CH-12, CH-09) may write any file in their own worktree with the file tools, because their code and tests contain push commands and credential paths as text; a blocked or denied shell command still stops the ticket. CH-11's implementer redid two blocked edits with the file tools before this was allowed; accepted once the review confirmed the diff.
 - 2026-11-23: a guard crash on a credential-like call asks instead of allowing (CH-07).
 - 2026-11-23: new `pushPolicy: "feature-branches"`: agents (main session and subagents) may push feature branches without a prompt, never `main`/`master`; anything the guard can't prove asks (CH-09). Replaces the CH-07 subagent-push item.
 
