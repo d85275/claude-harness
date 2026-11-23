@@ -724,8 +724,46 @@ EOF
 git tag -a v1 -F - <<'EOF'
 release: grep .env no longer needed
 EOF
-=== all=allow # gap: SSH private keys without a key suffix are not in the default protectedPaths
+=== all=block
 cat ~/.ssh/id_rsa
+=== all=block
+cat ~/.ssh/id_ecdsa
+=== all=block
+cat ~/.ssh/id_ed25519
+=== all=block
+cat ~/.ssh/id_dsa
+=== all=block
+cat ~/.ssh/id_ed25519_sk
+=== all=block
+cp deploy/id_ed25519 /tmp/
+=== all=block
+cp deploy/id_rsa /tmp/
+=== all=allow
+cat ~/.ssh/id_rsa.pub
+=== all=allow
+cat ~/.ssh/id_ed25519.pub
+=== all=allow
+ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519
+=== all=allow
+ls ~/.ssh
+=== all=allow
+cat ~/.ssh/config
+=== all=allow
+cat ~/.ssh/known_hosts
+=== all=block
+echo $(cat .env)
+=== all=block
+x=$(cat .env)
+=== all=block
+echo `cat .env`
+=== all=block
+(cat .env)
+=== all=block
+{ cat .env; }
+=== all=allow # gap: a read inside $(...) in double quotes is one shell word, so the path is not seen
+echo "$(cat ~/.ssh/id_rsa)"
+=== all=block
+x=$(cat ~/.ssh/id_ed25519)
 === all=block
 cat ~/.ssh/deploy.pem
 === all=block
@@ -769,7 +807,7 @@ EOF
 node - <<'EOF'
 const p = "/x/.env.local"
 EOF
-=== all=allow # gap: a credential word glued to ")" (".env)") is not matched; not a data body either
+=== all=block
 cat > out.txt <<EOF
 value=$(cat .env)
 EOF

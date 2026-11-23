@@ -28,7 +28,10 @@ from shell_scan import CheckTooLarge  # noqa: E402
 DEFAULT_PROTECTED_PATHS = [
     "**/*.p8", "**/*.p12", "**/*.pem", "**/*.key", "**/*.jks", "**/*.keystore",
     "**/*service-account*.json", "**/.env", "**/.env.*",
+    # SSH private keys (the .pub files do not match)
+    "**/id_rsa", "**/id_dsa", "**/id_ecdsa", "**/id_ecdsa_sk", "**/id_ed25519", "**/id_ed25519_sk",
 ]
+SHELL_PUNCTUATION = "(){};`"
 PUSH_POLICIES = ("ask", "deny", "allow")
 # Deploys and destructive cloud commands: always ask, whatever pushPolicy says (with askCommands).
 ALWAYS_ASK_COMMANDS = [
@@ -120,6 +123,12 @@ class DataText:
         if re.search(pattern, self.outside):
             return True
         return any(not self.inside(m.start(), m.end()) for m in re.finditer(pattern, self.full))
+
+
+def unglue(token):
+    """The token without shell punctuation glued to it: what follows the last `$(`, minus leading
+    and trailing ( ) { } ; and backticks (`.env)` -> `.env`, `x=$(cat` -> `cat`)."""
+    return token.rsplit("$(", 1)[-1].strip(SHELL_PUNCTUATION)
 
 
 def matches(path, globs, cwd, roots=()):
@@ -235,10 +244,12 @@ def check(cmd, cfg, cwd, roots):
         tokens = text.outside.split() if too_large else shlex.split(text.outside, posix=True)
     except ValueError:
         tokens = text.outside.split()
-    tokens = list(dict.fromkeys(tokens))
+    # Each token is also read without glued shell punctuation (CH-11); the original stays too.
+    tokens = list(dict.fromkeys(tokens + [unglue(t) for t in tokens]))
     words = {os.path.basename(t) for t in tokens}
     if text.spans:
         words |= {os.path.basename(t) for t in cmd.split()}
+        words |= {os.path.basename(unglue(t)) for t in cmd.split()}
     protected = DEFAULT_PROTECTED_PATHS + cfg.get("protectedPaths", [])
     if words & READ_VERBS:
         for t in tokens:
