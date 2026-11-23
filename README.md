@@ -173,7 +173,7 @@ Open the working example: [docs/examples/board.html](docs/examples/board.html), 
 
 ## Limits
 
-- **Every push asks unless you set `pushPolicy: "allow"`.** Agents cannot push a feature branch without a prompt, and no setting allows feature-branch pushes only. `"allow"` removes this hook's prompt for every push, subagents included. Allowing feature-branch pushes is planned after 1.0.
+- **Every push asks (or is blocked under `"deny"`) unless you set `pushPolicy: "allow"`.** Agents cannot push a feature branch without a prompt, and no setting allows feature-branch pushes only. `"allow"` removes this hook's prompt for every push, subagents included. Allowing feature-branch pushes is planned after 1.0.
 - **Existing trackers cannot be adopted yet.** `/ticket-init` sets up new projects only. If your project already has a ticket tracker or a `docs/tickets/` folder, it stops and writes nothing. Adopting one is planned after 1.0.
 - **The guards miss indirect forms.** Scripts, aliases and commands built from variables can get through. The known gaps of each rule are in [docs/guards.md](docs/guards.md).
 - **Claude Code and macOS first.** The device-reset guards cover Xcode simulators and Android emulators.
@@ -183,6 +183,8 @@ Open the working example: [docs/examples/board.html](docs/examples/board.html), 
 - [docs/guards.md](docs/guards.md): every guard rule, what it matches, and its known gaps.
 - [docs/configuration.md](docs/configuration.md): every `harness.json` key, how config files merge, and the board commands.
 - [docs/agents.md](docs/agents.md): the agents, models and routing.
+- [CHANGELOG.md](CHANGELOG.md): what changed in each version.
+- [CONTRIBUTING.md](CONTRIBUTING.md): running the tests and how changes are made.
 
 ## Credits
 

@@ -8,7 +8,7 @@ ROOT = os.path.realpath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(ROOT, "hooks", "scripts"))
 import harness_config  # noqa: E402
 
-PAGES = ["README.md", "docs/guards.md", "docs/configuration.md", "docs/agents.md"]
+PAGES = ["README.md", "docs/guards.md", "docs/configuration.md", "docs/agents.md", "CHANGELOG.md", "CONTRIBUTING.md"]
 LINK = re.compile(r"!?\[[^\]]*\]\(([^)\s]+)\)")
 
 

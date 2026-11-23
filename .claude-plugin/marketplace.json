@@ -11,6 +11,7 @@
     {
       "name": "dev-harness",
       "source": "./",
+      "version": "1.0.0",
       "description": "Plan -> implement -> independent review -> integrate loop with safety hooks.",
       "category": "productivity"
     }
