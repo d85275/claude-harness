@@ -305,6 +305,13 @@ class LooksCredentialTests(TempCase):
 
 
 class SizeCapTests(TempCase):
+    def no_deadline(self):
+        """Both real deadlines patched to 60 s, for tests that are not about the deadline."""
+        stack = contextlib.ExitStack()
+        stack.enter_context(mock.patch.object(bash_rules.shell_scan, "CHECK_SECONDS", 60))
+        stack.enter_context(mock.patch.object(bash_rules, "CREDENTIAL_SECONDS", 60))
+        return stack
+
     def check(self, cmd):
         cfg = dict(harness_config.DEFAULTS)
         with mock.patch.object(bash_rules.shlex, "split", side_effect=AssertionError("shlex ran")):
@@ -335,31 +342,48 @@ class SizeCapTests(TempCase):
         cmd = "cat " + " ".join(f"x{i}" for i in range(30000))  # under the size cap
         self.assertLess(len(cmd), bash_rules.shell_scan.LONGEST_COMMAND)
         with mock.patch.object(bash_rules, "CREDENTIAL_SECONDS", 0.3):
-            start = time.monotonic()
+            start = time.process_time()  # CPU time: the deadline is the point, not the wall clock
             result = bash_rules.check(cmd, cfg, self.cwd, [self.cwd, self.tmp])
-        self.assertLess(time.monotonic() - start, 3)
+        self.assertLess(time.process_time() - start, 3)
         self.assertEqual(result[0], "ask")
         self.assertIn("too large to check", result[1])
 
     def test_repeated_tokens_are_checked_once(self):
         cfg = dict(harness_config.DEFAULTS, protectedPaths=[f"zone{i}/**/*.sec" for i in range(30)])
-        cmd = "cat " + "x " * 100000  # under the size cap; the default 4 s deadline applies
+        cmd = "cat " + "x " * 100000  # under the size cap
         self.assertLess(len(cmd), bash_rules.shell_scan.LONGEST_COMMAND)
-        start = time.monotonic()
-        bash_rules.check(cmd, cfg, self.cwd, [self.cwd, self.tmp])
-        self.assertLess(time.monotonic() - start, 3)
+        with self.no_deadline():
+            start = time.process_time()
+            bash_rules.check(cmd, cfg, self.cwd, [self.cwd, self.tmp])
+        self.assertLess(time.process_time() - start, 3)
 
     def test_hit_before_the_deadline_still_blocks_in_a_big_command(self):
         cfg = dict(harness_config.DEFAULTS, protectedPaths=["zone/**"])
         cmd = "cat zone/secret.txt " + " ".join(f"x{i}" for i in range(60000))
-        self.assertEqual(bash_rules.check(cmd, cfg, self.cwd, [])[0], "block")
+        with self.no_deadline():  # the deadline is not the point; only the hit is
+            self.assertEqual(bash_rules.check(cmd, cfg, self.cwd, [])[0], "block")
+
+    def test_hit_first_still_blocks_when_the_clock_jumps_past_the_deadline(self):
+        # Fake clock: the first readings (the deadline start, then the first token checks) are 0,
+        # every later one is far past the deadline. The hit is among the first tokens, so it must
+        # be found before the deadline stops the pass.
+        cfg = dict(harness_config.DEFAULTS, protectedPaths=["zone/**"])
+        cmd = "cat zone/secret.txt " + " ".join(f"x{i}" for i in range(60000))
+        readings = iter([0.0] * 4)
+        clock = lambda: next(readings, 1000.0)
+        with mock.patch.object(bash_rules.time, "monotonic", clock):
+            result = bash_rules.check(cmd, cfg, self.cwd, [])
+        self.assertEqual(result[0], "block")
+
+    def test_default_deadlines(self):
+        self.assertEqual(bash_rules.CREDENTIAL_SECONDS, 4)
 
     def test_huge_command_is_fast(self):
-        start = time.monotonic()
+        start = time.process_time()
         result = bash_rules.check("cat " + "a" * 1_000_000, dict(harness_config.DEFAULTS),
                                   self.cwd, [])
         self.assertEqual(result[0], "ask")
-        self.assertLess(time.monotonic() - start, 2)
+        self.assertLess(time.process_time() - start, 2)
 
 
 class WarningDedupTests(TempCase):

@@ -43,10 +43,14 @@ class DataHeredocRuleTests(unittest.TestCase):
         body = f"cat {KEY}\n{RESET}\n" + "x = 1\n" * 30000
         cmd = f"cat > t.py <<'EOF'\n{body}EOF"
         self.assertLess(len(cmd), bash_rules.shell_scan.LONGEST_COMMAND)
-        start = time.monotonic()
-        self.assertEqual(self.decision(cmd), "allow")
-        self.assertLess(time.monotonic() - start, 3)
-        self.assertEqual(self.decision(cmd + f"\ncat {KEY}"), "block")
+        # Real deadlines are not what this test is about: patch them high so a busy machine
+        # cannot turn "exempt" into "too large"; the speed assert counts CPU time, not wall time.
+        with mock.patch.object(bash_rules.shell_scan, "CHECK_SECONDS", 60), \
+                mock.patch.object(bash_rules, "CREDENTIAL_SECONDS", 60):
+            start = time.process_time()
+            self.assertEqual(self.decision(cmd), "allow")
+            self.assertLess(time.process_time() - start, 3)
+            self.assertEqual(self.decision(cmd + f"\ncat {KEY}"), "block")
 
     def test_over_the_cap_nothing_is_exempt(self):
         body = f"cat {KEY}\n" + "x = 1\n" * (bash_rules.shell_scan.LONGEST_COMMAND // 6 + 1)

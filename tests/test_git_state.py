@@ -74,6 +74,33 @@ class GitStateTests(unittest.TestCase):
     def test_stash_in_data_heredoc_does_not_count(self):
         self.assertEqual(self.decide("cat > n.md <<'EOF'\ngit stash pop\nEOF", self.multi), "allow")
 
+    def test_unsafe_data_heredoc_body_counts_for_stash_and_hooks_path(self):
+        # CH-13: each DATA_TEXT_UNSAFE trick makes a body line a command; two worktrees for stash
+        tricks = ["echo hi # c\ncat > t.txt <<'EOF'\nBODY\nEOF",
+                  "echo ${x}\ncat > t.txt <<'EOF'\nBODY\nEOF",
+                  "cat() { bash; }\ncat > t.txt <<'EOF'\nBODY\nEOF",
+                  "cat > /dev/stdout <<'EOF'\nBODY\nEOF",
+                  "cat > t.txt <<'EOF'\nBODY\r\nEOF",
+                  "cat > t.txt <<'EOF'\r\nx\nEOF\r\nBODY\nEOF"]
+        for template in tricks:
+            for body in ("git stash pop", "git config core.hooksPath x"):
+                cmd = template.replace("BODY", body)
+                with self.subTest(cmd=cmd):
+                    self.assertEqual(self.decide(cmd, self.multi), "ask")
+                    self.assertEqual(self.decide(cmd, self.other), "ask")
+        # stash in a single worktree still passes; a plain body is still data
+        self.assertEqual(self.decide(tricks[0].replace("BODY", "git stash pop"), self.single),
+                         "allow")
+        self.assertEqual(self.decide(
+            "cat > t.txt <<'EOF'\ngit config core.hooksPath x\nEOF", self.multi), "allow")
+
+    def test_unsafe_outer_text_makes_nested_stash_body_count(self):
+        cmd = ("cat() { bash; }; export -f cat; bash -c 'cat > f <<EOF\n"
+               "git sta'\"sh pop\"'\nEOF'")
+        self.assertEqual(self.decide(cmd, self.multi), "ask")
+        self.assertEqual(self.decide(cmd, self.other), "ask")
+        self.assertEqual(self.decide(cmd, self.single), "allow")
+
     def test_git_dash_c_counts_the_target_repo(self):
         self.assertEqual(self.decide(f"git -C {self.multi} stash pop", self.single), "ask")
         self.assertEqual(self.decide(f"git -C {self.single} stash pop", self.multi), "allow")

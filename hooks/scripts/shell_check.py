@@ -152,24 +152,35 @@ class ShellCheck(shell_scan.Budget):
             raise ValueError("NUL byte in command")
         if len(cmd) > shell_scan.LONGEST_COMMAND:
             raise CheckTooLarge()
-        full, spans = self.analyze(cmd, [self.cwd], 0)
-        if spans and data_text_unsafe(cmd, *outside_and_openings(full, spans)):
-            spans = []  # scanner and bash may disagree about the bodies: no hit is text
+        self.analyze(cmd, [self.cwd], 0)
+        unsafe = self.texts_unsafe()
 
-        def counts(match):  # a hit inside a data heredoc body is not a command
-            return not any(a <= match.start() and match.end() <= b for a, b in spans)
+        # The structural rule: these regexes read the full text of the command and of each nested
+        # body; only a data heredoc removes a hit, and none does when any text is unsafe.
+        for full, spans in self.texts:
+            if unsafe:
+                spans = []  # scanner and bash may disagree about the bodies: no hit is text
 
-        # The structural rule: these regexes read the full text; only a data heredoc removes a hit.
-        for pattern in PUBLISH_COMMANDS:
-            for match in re.finditer(pattern, full, re.IGNORECASE):
+            def counts(match):  # a hit inside a data heredoc body is not a command
+                return not any(a <= match.start() and match.end() <= b for a, b in spans)
+
+            for pattern in PUBLISH_COMMANDS:
+                for match in re.finditer(pattern, full, re.IGNORECASE):
+                    self.tick()
+                    if counts(match):
+                        self.publish = True
+                        break
+            for match in RAW_REDIRECT.finditer(full):
                 self.tick()
                 if counts(match):
-                    self.publish = True
-                    break
-        for match in RAW_REDIRECT.finditer(full):
-            self.tick()
-            if counts(match):
-                self.candidate(match.group(1), [self.cwd])
+                    self.candidate(match.group(1), [self.cwd])
+
+    def texts_unsafe(self):
+        """Does a DATA_TEXT_UNSAFE check hold for the command or any nested text? (A nested text
+        is read in the light of the outer one: `cat() { bash; }` outside makes bodies inside an
+        `bash -c` string code too.)"""
+        return any(data_text_unsafe(full, *outside_and_openings(full, spans))
+                   for full, spans in self.texts)
 
     def candidate(self, word, bases, tree=False):
         if self.config_hit or not word:

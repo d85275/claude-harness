@@ -399,7 +399,11 @@ def git_state_hits(shell):
             if sub == "stash" and (len(rest) < 2 or rest[1].lower() not in ("list", "show")):
                 stash = True
                 stash_dirs += extra or [shell.cwd]
+    unsafe = shell.texts_unsafe()
     for full, spans in shell.texts:
+        if unsafe:
+            spans = []  # scanner and bash may disagree about the bodies: no hit is text
+
         def counts(m):
             return not any(a <= m.start() and m.end() <= b for a, b in spans)
         for m in STASH_REGEX.finditer(full):

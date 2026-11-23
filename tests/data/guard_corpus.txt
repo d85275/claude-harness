@@ -1026,3 +1026,45 @@ EOF
 git commit -F - <<'EOF'
 note: git push later
 EOF
+=== none=ask ask=ask deny=ask allow=ask
+echo hi # c
+cat > t.txt <<'EOF'
+git config core.hooksPath x
+EOF
+=== none=ask ask=ask deny=ask allow=ask
+echo hi # c
+cat > t.txt <<'EOF'
+git -c core.hooksPath=x log
+EOF
+=== none=ask ask=ask deny=ask allow=ask
+echo ${x}
+cat > t.txt <<'EOF'
+git config core.hooksPath x
+EOF
+=== none=ask ask=ask deny=ask allow=ask
+echo ${x}
+cat > t.txt <<'EOF'
+git -c core.hooksPath=x log
+EOF
+=== none=ask ask=ask deny=ask allow=ask
+cat() { bash; }
+cat > t.txt <<'EOF'
+git config core.hooksPath x
+EOF
+=== none=ask ask=ask deny=ask allow=ask
+cat() { bash; }
+cat > t.txt <<'EOF'
+git -c core.hooksPath=x log
+EOF
+=== none=ask ask=ask deny=ask allow=ask
+cat > /dev/stdout <<'EOF'
+git config core.hooksPath x
+EOF
+=== none=ask ask=ask deny=ask allow=ask
+cat > /dev/stdout <<'EOF'
+git -c core.hooksPath=x log
+EOF
+=== all=allow
+cat > t.txt <<'EOF'
+git config core.hooksPath x
+EOF
