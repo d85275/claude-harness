@@ -32,6 +32,58 @@ The pitch leads with the problem. The board comes fourth in the list but carries
 6. **Agents and models:** the table below, and why.
 7. **Limits, contributing, license.**
 
+## Flow chart (opens "A ticket's life")
+
+How each role takes a new feature from idea to `main`. GitHub renders Mermaid blocks natively.
+
+```mermaid
+flowchart TD
+    subgraph Owner["👤 You (owner)"]
+        O1["Describe the feature"]
+        O2{"Approve the plan?"}
+        O3["Decide escalated questions"]
+        O4["Push main when ready"]
+    end
+
+    subgraph Coord["🧭 Coordinator (main session, Opus recommended)"]
+        C1["/plan: write the ticket<br/>scope, done criteria, allowed files, review level"]
+        C2["/start-ticket: pick the implementer<br/>from the review level"]
+        C3["/review: pick reviewers<br/>from the diff, not the report"]
+        C4{"Verdict"}
+        C5["/close-ticket: cherry-pick onto main,<br/>rerun the checks, clean up"]
+    end
+
+    subgraph Impl["🛠 Implementer (Sonnet, or Opus for high-risk)"]
+        I1["Work in its own worktree<br/>.worktrees/id on feature/id"]
+        I2["Run the tests, record evidence"]
+        I3["Exactly one commit, then report"]
+    end
+
+    subgraph Rev["🔍 Reviewers (read-only)"]
+        R1["Reviewer, or high-risk reviewer<br/>reruns tests, reads the diff"]
+        R2["Silent-failure hunter<br/>for error-handling changes"]
+    end
+
+    Guard[["🛡 Guard hooks on every tool call<br/>push, deploy and credential reads ask or block"]]
+
+    O1 --> C1 --> O2
+    O2 -- "changes" --> C1
+    O2 -- "yes" --> C2 --> I1 --> I2 --> I3 --> C3
+    C3 --> R1 & R2
+    R1 & R2 --> C4
+    C4 -- "changes required" --> I1
+    C4 -- "round limit reached" --> O3 --> C2
+    C4 -- "accept" --> C5 --> O4
+
+    Guard -.-> Impl
+    Guard -.-> Coord
+```
+
+Notes:
+- The review loop sends findings back to the **same** implementer, which amends its one commit.
+- After the round limit (3 by default), the coordinator stops and asks the owner instead of looping.
+- Nothing is pushed by an agent; the last step is always the owner's.
+
 ## Agents and models table
 
 | Role | Model / effort | When it's used |

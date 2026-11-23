@@ -8,11 +8,22 @@ Goal: release **1.0** of the `dev-harness` plugin with a ticket system and a Jir
 - **B. Ticket system and board** (tickets to be written when A is integrated):
   - `/ticket-init`
   - board script: self-contained HTML, `--check`, standard library only
+    - **reads live worktrees too** (owner, 2026-11-23). Without this, a ticket being built shows as Planned until it is merged.
+      - **Matching:** a worktree on `feature/<id>` (the Harness section's branch pattern) maps to a known ticket ID; worktrees matching no ticket are ignored.
+      - **Shown state:** the more advanced of main's state, In progress (a live worktree exists), and the state in that worktree's own tracker row or ticket file (committed or not).
+      - **Caps:** unmerged work shows at most In review. Owner check, Done and Blocked on main are never moved.
+      - **Card:** shows the branch the state came from.
+      - **`--check`:** compares only main's row with main's file, so a worktree being ahead is not a mismatch.
+      - **When git fails:** the board still builds when git is missing or there are no worktrees; prunable and missing worktrees are skipped.
+      - **Rebuilds:** post-checkout (runs on `git worktree add`) and post-commit (runs in worktrees), always written into the main checkout's board; a removed worktree drops off at the next rebuild.
+      - **Reference:** a private project already built this; borrow the design, copy no code or names.
   - git hooks that chain to existing hooks (Git LFS) and work from worktrees
   - `close-ticket` additions
   - release check in `/sync`
   - read-only parser check against real projects to a temp folder (nothing copied into this repo)
   - acceptance: re-run `/ticket-init` on this repo
+  - `/ticket-init` adopts an existing tracker and ticket files without rewriting them (both private projects already have real tickets)
+  - after the 1.0 plugin update, each project switches over in a ticket run by its own coordinator: run `/ticket-init`; a project with its own board script and board hooks removes them and keeps its extra columns through settings (owner, 2026-11-23)
 - **C. Ready to publish**:
   - **README rewrite** (owner request 2026-11-22; working draft in [`README-draft.md`](README-draft.md)), so a newcomer understands what the plugin does:
     - an opening paragraph on the problem it solves and who it is for
@@ -32,7 +43,7 @@ Goal: release **1.0** of the `dev-harness` plugin with a ticket system and a Jir
 
 ## Next
 
-CH-01 is done (c2efe7d). CH-02 is done (ef867a1). CH-03 is done (b999c7d). CH-08 is done (99aedc3). Tickets run one at a time (owner, 2026-11-22), except that CH-06 may run alongside one other ticket (owner, 2026-11-22). Running: CH-04 and CH-06. Then CH-05, then CH-07. Every remaining ticket has an explicit catch list and at most 2 review rounds (owner, 2026-11-22).
+CH-01 is done (c2efe7d). CH-02 is done (ef867a1). CH-03 is done (b999c7d). CH-08 is done (99aedc3). Tickets run one at a time (owner, 2026-11-22), except that CH-06 may run alongside one other ticket (owner, 2026-11-22). CH-04 is done (19319cb). Running: CH-06 (resumed 2026-11-23 once no build was running) and CH-05. Then CH-07, then Milestone B (owner, 2026-11-23). Every remaining ticket has an explicit catch list and at most 2 review rounds (owner, 2026-11-22).
 
 ## Owner decisions
 

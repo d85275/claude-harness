@@ -10,7 +10,7 @@ States: `Planned`, `In progress`, `In review`, `Fixing`, `Owner check`, `Done`, 
 | [CH-02](CH-02.md) | Model tiers and implementer routing | standard | Done | ef867a1 | 2 review rounds; adds `bin/dev-harness-config` |
 | [CH-03](CH-03.md) | Push policy | high-risk | Done | b999c7d | 3 high-risk rounds + coordinator-verified fix (owner); 224-row guard corpus |
 | [CH-04](CH-04.md) | Stash and `core.hooksPath` guards | standard | Done | 19319cb | 1 review round |
-| [CH-05](CH-05.md) | Warn on generated / ignored files in commits | standard + SF | Planned | | |
-| [CH-06](CH-06.md) | Device rules as presets, auto-on for mobile projects | standard | Blocked | | Paused: guard false positive on test text; owner decides how to continue |
+| [CH-05](CH-05.md) | Warn on generated / ignored files in commits | standard + SF | In progress | | |
+| [CH-06](CH-06.md) | Device rules as presets, auto-on for mobile projects | standard | In progress | | Resumed 2026-11-23 once no build was running (owner); paused earlier by a guard false positive on test text |
 | [CH-07](CH-07.md) | Close remaining fail-open paths in the guard | standard + SF | Planned | | From CH-01 review |
 | [CH-08](CH-08.md) | Split `guard.py` into scanner, Bash rules and hook entry | high-risk | Done | 99aedc3 | 1 high-risk round; output identical to main |
