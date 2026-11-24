@@ -4,6 +4,26 @@ All notable changes to the `dev-harness` plugin. The format follows [Keep a Chan
 
 A version's date is set when the owner tags the release; until then it reads `Unreleased`. Earlier versions were not tagged; their dates are commit dates. Ticket IDs in parentheses point at [`docs/tickets/`](docs/tickets/).
 
+## [1.1.0] - 2026-11-24
+
+### Added
+
+- **`/ticket-init` adopts a project that already has tickets.** `dev-harness-board init --check` (the dry run) lists every ticket the new board would show, per column, with the file and tracker row it came from; then every file or row it did not use and why, and what it could not tell. It ends with a hash of that list. `init --confirm <hash>` switches only if the list is unchanged, and writes only the `tickets` settings in `harness.json`, a CLAUDE.md Harness section if there is none, and the board; it proves that no tracker or ticket file changed. Old tickets are never rewritten; removing an old board script and hooks is left to the project. Unreadable files, tracker rows it cannot read, unknown states without an alias and a second tracker block the switch until fixed. (CH-19)
+- **`init --fresh`** sets up a project whose only ticket-like files are test or example data, after you have seen them listed. (CH-19)
+- **New setting `tickets.notesFiles`**: files in the ticket folders that are notes, not tickets or trackers. They are listed as not used and never block the switch. (CH-19)
+
+### Fixed
+
+- The board's git hook tests no longer fail when git starts background maintenance during a test (seen on the macOS CI runner).
+
+### Known limits
+
+- Only `.md` files are read (plus `.markdown` inside the ticket folders). Other record formats (`.txt`, `.yaml`, `.mdx`, `.rst`) outside the ticket folders are not looked for, and bullet backlogs in other documents are not seen.
+- Weak matches outside the ticket folders are listed under "Could not tell" and never block. Tool folders and linked folders are not searched; dot folders and folders deeper than six levels get a name-only look.
+- Tickets in `test`, `tests`, `fixtures`, `examples` and `samples` folders are taken as test data; use `init --fresh` after seeing the list if they are the only ones. Non-UTF-8 files there still block.
+- A `notesFiles` entry that matches nothing, or matches a ticket file or the tracker, is not reported.
+- After a switch, `init --mode` reports adopt until a plain `dev-harness-board --check` is clean (for example, a row and its ticket file disagree on the state).
+
 ## [1.0.0] - 2026-11-24
 
 The first release with a ticket system and board. It also makes the guards stricter and the settings file one documented schema. Everything below is new or changed since 0.2.0.

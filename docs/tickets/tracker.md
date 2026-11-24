@@ -24,7 +24,7 @@ States: `Planned`, `In progress`, `In review`, `Fixing`, `Owner check`, `Done`, 
 | [CH-16](CH-16.md) | Board reads live worktrees | standard | Done | 62712f1 | Milestone B; owner requirement 2026-11-23 |
 | [CH-17](CH-17.md) | Git hooks that rebuild the board | high-risk | Done | 70fd1f6 | Milestone B; chains existing hooks (LFS) |
 | [CH-18](CH-18.md) | `/ticket-init` for a new project | standard | Done | 613f82e | Milestone B |
-| [CH-19](CH-19.md) | `/ticket-init` adopts existing trackers, with a dry-run migration report | standard + SF | In review   | | Resumed 2026-11-24 for 1.1.0, owner-confirmed ticket list design |
+| [CH-19](CH-19.md) | `/ticket-init` adopts existing trackers, with a dry-run migration report | standard + SF | Done | 399c170 | Resumed 2026-11-24 for 1.1.0, owner-confirmed ticket list design |
 | [CH-20](CH-20.md) | Start, review and close keep ticket state; release check in `/sync` | standard | Done | ce55063 | Milestone B |
 | [CH-21](CH-21.md) | Check against real projects (read-only) and dogfood acceptance | standard | Done | aa306f5 | Milestone B; reduced scope (board only), owner 2026-11-23 |
 | [CH-22](CH-22.md) | Guard asks before installing or removing the board's git hooks | standard | Done | 5d4211b | Owner request 2026-11-23 after the CH-17 review; 1 review round |
