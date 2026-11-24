@@ -1,5 +1,7 @@
 # dev-harness
 
+[![test](https://github.com/d85275/claude-harness/actions/workflows/test.yml/badge.svg)](https://github.com/d85275/claude-harness/actions/workflows/test.yml)
+
 **Let Claude Code agents build your project ticket by ticket, while you stay in charge.**
 
 dev-harness is a Claude Code plugin for solo developers and small teams. It gives agents a workflow and guardrails:
@@ -13,7 +15,7 @@ dev-harness is a Claude Code plugin for solo developers and small teams. It give
 
 ## Install
 
-You need Claude Code, git and Python 3.9 or newer. macOS is the main target; Linux should work.
+You need Claude Code, git and Python 3.9 or newer. Tested on macOS and Linux (Ubuntu) in CI; desktop notifications are macOS only.
 
 In Claude Code:
 

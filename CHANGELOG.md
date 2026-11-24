@@ -75,7 +75,7 @@ The first release with a ticket system and board. It also makes the guards stric
 - **Every push asks (or is blocked under `"deny"`) unless you set `pushPolicy: "allow"`.** No setting yet lets agents push feature branches without a prompt.
 - **`/ticket-init` sets up new projects only.** It stops and writes nothing in a project that already has a ticket tracker or a ticket folder.
 - **The guards match command text.** Scripts, aliases and commands built from variables can get through; the gaps of each rule are in [docs/guards.md](docs/guards.md). Claude Code permission deny rules are the hard boundary.
-- **macOS first.** Desktop notifications are macOS only. Linux is covered by CI but untested until the first CI run passes.
+- **Desktop notifications are macOS only.** Everything else is tested on macOS and Linux (Ubuntu) in CI.
 
 ### Planned after 1.0
 
