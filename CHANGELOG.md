@@ -4,7 +4,7 @@ All notable changes to the `dev-harness` plugin. The format follows [Keep a Chan
 
 A version's date is set when the owner tags the release; until then it reads `Unreleased`. Earlier versions were not tagged; their dates are commit dates. Ticket IDs in parentheses point at [`docs/tickets/`](docs/tickets/).
 
-## [1.0.0] - Unreleased
+## [1.0.0] - 2026-11-24
 
 The first release with a ticket system and board. It also makes the guards stricter and the settings file one documented schema. Everything below is new or changed since 0.2.0.
 
