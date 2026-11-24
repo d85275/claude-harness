@@ -37,7 +37,7 @@ This repository uses its own loop. Each change is a ticket in [`docs/tickets/`](
 3. **Review.** `/review` sends the commit to an independent reviewer; changes that weaken or bypass a guard, git hooks, and releases go to the high-risk reviewer. Fixes amend the same commit.
 4. **Integrate.** `/close-ticket` cherry-picks the commit onto `main` and reruns the tests.
 
-The loop and the commands are described in the [README](README.md#the-loop). Repository rules for agents are in [`CLAUDE.md`](CLAUDE.md).
+The loop and the commands are described in the [README](README.md#how-it-works). Repository rules for agents are in [`CLAUDE.md`](CLAUDE.md).
 
 You do not need Claude Code to contribute: an ordinary pull request with tests is welcome. Small, focused changes with a test that fails without them are the easiest to review.
 

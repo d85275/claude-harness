@@ -1,6 +1,6 @@
 # Agents and models
 
-The plugin's agents, the model each one runs on, and how work is routed to them. The loop they take part in is described in the [README](../README.md#the-loop).
+The plugin's agents, the model each one runs on, and how work is routed to them. The loop they take part in is described in the [README](../README.md#how-it-works).
 
 | Role | Model / effort | Used for |
 |---|---|---|
