@@ -36,3 +36,4 @@ States: `Planned`, `In progress`, `In review`, `Fixing`, `Owner check`, `Done`, 
 | [CH-28](CH-28.md) | Pre-publish privacy sweep of the whole history | high-risk | Done | 2e69f1d | Milestone C |
 | [CH-29](CH-29.md) | Plugin ticket commands leave projects that have not switched over alone | standard | Done | 50a3eed | Owner request 2026-11-23, before tagging 1.0 |
 | [CH-30](CH-30.md) | Shorter README | self-review | Done | 4a187b3 | Owner request 2026-11-24, before tagging 1.0 |
+| [CH-31](CH-31.md) | A wildcard write asks only when it can reach a protected config | high-risk | In progress | | Owner request 2026-11-24, after a false prompt in a real project |
