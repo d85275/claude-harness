@@ -116,7 +116,8 @@ class CorpusTests(unittest.TestCase):
                     self.assertEqual(self.decide(cmd, self.dirs[setup]), expect[setup])
 
     def test_no_private_data(self):
-        text = open(CORPUS).read()
+        with open(CORPUS, encoding="utf-8") as f:
+            text = f.read()
         self.assertIsNone(re.search(r"/Users/|/home/[a-z]", text))
 
 

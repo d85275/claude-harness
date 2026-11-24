@@ -77,6 +77,9 @@ class Env(unittest.TestCase):
             "PATH": os.pathsep.join([self.fakebin] + path), "HOME": self.home, "TMPDIR": self.tmpdir,
             "GIT_CONFIG_GLOBAL": self.gitconfig, "GIT_CONFIG_SYSTEM": os.devnull,
             "GIT_CONFIG_NOSYSTEM": "1",
+            # No background gc or maintenance: its lock files would change the snapshots.
+            "GIT_CONFIG_COUNT": "2", "GIT_CONFIG_KEY_0": "gc.auto", "GIT_CONFIG_VALUE_0": "0",
+            "GIT_CONFIG_KEY_1": "maintenance.auto", "GIT_CONFIG_VALUE_1": "false",
             "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
             "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com",
             "HOOK_LOG": self.log, "DEV_HARNESS_BOARD": BIN, "DEV_HARNESS_HOOK_TIMEOUT": "20"})
