@@ -45,8 +45,10 @@ Your main Claude Code session is the **coordinator**: it plans, starts the agent
 | Role | Model | What it does |
 |---|---|---|
 | Coordinator (your main session) | Your choice; Opus recommended | Plans tickets, starts agents, judges reviews |
-| Implementer | Sonnet; Opus for high-risk tickets | Does one ticket in its own worktree and makes one commit |
-| Reviewer | Sonnet; Opus for high-risk tickets | Reruns the tests and reads the diff; changes nothing |
+| Implementer | Sonnet | Does one ticket in its own worktree and makes one commit |
+| Advanced implementer | Opus | The same, for high-risk tickets |
+| Reviewer | Sonnet | Reruns the tests and reads the diff; changes nothing |
+| High-risk reviewer | Opus (or Fable, if you opt in) | A stricter review for high-risk tickets |
 | Silent-failure hunter | Sonnet | Extra review for error handling: swallowed errors, silent fallbacks |
 
 A ticket is **high-risk** when it touches things like login, payments, deleting data, security or releases; you list your own categories. More about the agents: [docs/agents.md](docs/agents.md).
