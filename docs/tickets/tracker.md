@@ -38,3 +38,4 @@ States: `Planned`, `In progress`, `In review`, `Fixing`, `Owner check`, `Done`, 
 | [CH-30](CH-30.md) | Shorter README | self-review | Done | 4a187b3 | Owner request 2026-11-24, before tagging 1.0 |
 | [CH-31](CH-31.md) | A wildcard write asks only when it can reach a protected config | high-risk | In progress | | Owner request 2026-11-24, after a false prompt in a real project |
 | [CH-32](CH-32.md) | The board's Done column is collapsed by default | standard | Planned | | Owner decision 2026-11-25 |
+| [CH-33](CH-33.md) | Fewer prompts during ticket work | high-risk | Planned | | Owner request 2026-11-25 |
