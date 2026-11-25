@@ -248,6 +248,7 @@ def check(cmd, cfg, cwd, roots):
         shell = ShellCheck(dict(cfg, protectedConfigs=[
             *(configs if isinstance(configs, list) else []), HOOKS_FOLDER_GLOB]), cwd, roots)
         shell.run(cmd)
+        expand_globs(shell)
         git_state = git_state_hits(shell)
         commit_dirs = commit_folders(shell)
     except CheckTooLarge:
@@ -276,9 +277,10 @@ def check(cmd, cfg, cwd, roots):
                 + f" Command: {cmd[:200]}")
     if shell.config_hit:
         return ("ask", "Command looks like it writes, moves, deletes or changes the mode of a "
-                f"protected config ({shell.config_hit}: lint/test thresholds, validators, or "
-                "guardrails such as harness.json). Fix the code instead of weakening the check, "
-                f"unless the owner approves. Command: {cmd[:200]}")
+                f"protected config: {shell.config_why or shell.config_hit}. Protected configs "
+                "are lint/test thresholds, validators, or guardrails such as harness.json; fix "
+                "the code instead of weakening the check, unless the owner approves. "
+                f"Command: {cmd[:200]}")
     if git_state:
         ask = git_state_ask(git_state, cwd, cmd)
         if ask:
@@ -293,6 +295,174 @@ def check(cmd, cfg, cwd, roots):
             return ("ask", "Outward-facing or destructive command needs the owner's explicit OK: "
                     f"{cmd[:200]}")
     return None
+
+
+# --- globs written by rm, cp, mv, chmod ...: look in the folder (CH-31) ------------------------
+GLOB_CAP = 200        # paths looked at for one glob (matches plus everything under them)
+LISTING_CAP = 5000    # entries in one listed folder
+
+
+def expand_globs(shell):
+    """For each glob ShellCheck left to expand (shell.globs: it could match a protected config
+    by name, and nothing else in the command changes files), list the folders and record a hit
+    on shell unless the expansion is certain and reaches no protected config. Costs work-budget
+    steps; raises CheckTooLarge like the rest of the shell check."""
+    if shell.globs and shell.plain_cd and (os.environ.get("CDPATH") or any(
+            "CDPATH" in full for full, _ in shell.texts)):
+        for word, _, _, verb, part, pattern, _ in shell.globs:
+            shell.hit_found(word, pattern, part, verb, reason=(
+                f"not expanded: CDPATH is set, so `{shell.plain_cd}` may go elsewhere; "
+                "write cd ./name"))
+        return
+    for word, bases, tree, verb, part, pattern, index in shell.globs:
+        if shell.config_hit:
+            return
+        for base in bases:
+            reason = folder_changed(shell, word, base, index)
+            if reason:
+                shell.hit_found(word, pattern, part, verb, reason="not expanded: " + reason)
+                return
+            path, matched, reason = glob_reaches(shell, word, base, tree)
+            if path:
+                shell.hit_found(word, matched, part, verb, path=shown_path(path, base))
+            elif matched or reason:
+                shell.hit_found(word, matched or pattern, part, verb,
+                                reason=("" if matched else "not expanded: ") + reason)
+            else:
+                continue
+            return
+
+
+def folder_changed(shell, word, base, index):
+    """Why another simple command in the line (not number index, the glob's own) may put files
+    into, or rename files in, the folder the glob lists from base, or a parent of it; or why that
+    folder is not known. None when no command can."""
+    if not os.path.isdir(base):  # a cd that fails, or goes elsewhere (zsh cdablevars)
+        return f"the folder {base} does not exist"
+    fixed = []
+    for part in [p for p in word.split("/") if p]:
+        if any(c in part for c in "*?"):
+            break
+        fixed.append(part)
+    folder = os.path.join("/" if word.startswith("/") else base, *fixed)
+    fold = shell.matcher.fold
+    forms = {fold(os.path.normpath(folder)), fold(os.path.realpath(folder))}
+    for j, effect in enumerate(shell.effects):
+        if j == index or not effect or effect[0] != "paths":
+            continue
+        _, who, paths = effect
+        for path in paths:
+            shell.tick()
+            for p in {fold(os.path.normpath(path)), fold(os.path.realpath(path))}:
+                for f in forms:
+                    if p == f or p.startswith(f.rstrip("/") + "/") or f.startswith(
+                            p.rstrip("/") + "/"):
+                        return (f"another part of the command ({who}) may put files into "
+                                f"{shown_path(path, base)}")
+    return None
+
+
+def shown_path(path, base):
+    rel = os.path.relpath(path, base)
+    return path if rel.startswith("..") else rel
+
+
+def inside_project(shell, folder):
+    """Is the real path of folder the working directory, a project root, or inside one?"""
+    real = shell.matcher.fold(os.path.realpath(folder))
+    for top in [shell.cwd] + list(shell.roots):
+        top = shell.matcher.fold(os.path.realpath(top)).rstrip("/") + "/"
+        if real + "/" == top or real.startswith(top):
+            return True
+    return False
+
+
+def list_folder(shell, folder):
+    """Names in folder; none when it does not exist (the shell matches nothing there either).
+    Raises OSError when it cannot be read, or ValueError past LISTING_CAP."""
+    names = []
+    try:
+        it = os.scandir(folder)
+    except (FileNotFoundError, NotADirectoryError):
+        return names
+    with it:
+        for entry in it:
+            names.append(entry.name)
+            if len(names) > LISTING_CAP:
+                raise ValueError(f"more than {LISTING_CAP} entries")
+    shell.tick(1 + len(names))
+    return names
+
+
+def glob_reaches(shell, word, base, tree):
+    """Expand a glob from base the way the shell would, as a superset (dot files, `.` and `..`,
+    any letter case), and look at every path it reaches, down through matched folders.
+    Returns (path, pattern, None) when a path hits a protected config; (None, pattern, reason)
+    when a listed folder is itself on the way to one (`.claude/*`); (None, None, reason) when
+    the expansion is not certain; (None, None, None) when nothing is reached."""
+    paths = ["/" if word.startswith("/") else base]
+    for part in [p for p in word.split("/") if p]:
+        if not any(c in part for c in "*?"):
+            paths = [os.path.join(p, part) for p in paths]
+            continue
+        rx = re.compile(fnmatch.translate(part), re.IGNORECASE)
+        found = []
+        for folder in paths:
+            shown = shown_path(folder, base)
+            if not inside_project(shell, folder):
+                return None, None, f"{shown} is outside the working directory and project roots"
+            for form in (os.path.normpath(folder), os.path.realpath(folder)):
+                pattern = shell.matcher.hit(form)
+                if pattern:
+                    return None, pattern, f"the folder {shown} can hold {pattern}"
+            try:
+                names = list_folder(shell, folder)
+            except (OSError, ValueError) as e:
+                return None, None, f"could not list {shown} ({type(e).__name__})"
+            extra = [".", ".."] if part.startswith(".") else []
+            found += [os.path.join(folder, n) for n in names + extra if rx.match(n)]
+            if len(found) > GLOB_CAP:
+                return None, None, f"the glob matches more than {GLOB_CAP} paths"
+        paths = found
+    todo, looked = [(p, True) for p in paths], 0
+    while todo:
+        path, top = todo.pop()
+        looked += 1
+        shell.tick()
+        if looked > GLOB_CAP:
+            return None, None, f"more than {GLOB_CAP} paths to look at"
+        name, shown = os.path.basename(path), shown_path(path, base)
+        if any(c in name for c in "*?[]"):
+            return None, None, f"the file name {shown} has glob characters"
+        if top and "/" not in word and name.startswith("-"):
+            return None, None, f"the file name {name} would be read as an option"
+        if not inside_project(shell, os.path.dirname(path)):
+            return None, None, f"{shown} is outside the working directory and project roots"
+        for form in (os.path.normpath(path), os.path.realpath(path)):
+            pattern = shell.matcher.hit(form, tree)
+            if pattern:
+                return path, pattern, None
+        if name in (".", ".."):  # a whole folder (`out/.*`): not looked through
+            return None, None, f"the glob matches {shown}"
+        if os.path.islink(path):
+            if os.path.isdir(path):
+                return None, None, f"{shown} is a link to a folder"
+            continue
+        try:
+            hard_links = os.lstat(path).st_nlink > 1 and not os.path.isdir(path)
+        except FileNotFoundError:  # a literal name after the glob, not there
+            continue
+        except OSError as e:
+            return None, None, f"could not read {shown} ({type(e).__name__})"
+        if hard_links:  # chmod, touch or cp through it changes every name of the file
+            return None, None, f"{shown} has other hard links"
+        if os.path.isdir(path):
+            try:
+                names = list_folder(shell, path)
+            except (OSError, ValueError) as e:
+                return None, None, f"could not list {shown} ({type(e).__name__})"
+            todo += [(os.path.join(path, n), False) for n in names]
+    return None, None, None
 
 
 def push_policy(cfg):
