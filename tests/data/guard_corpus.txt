@@ -1180,3 +1180,45 @@ echo `dev-harness-board install-hooks --check`
 echo "$(dev-harness-board --check)"
 === all=allow
 echo `git config core.hooksPath`
+=== all=allow
+cat > docs/release.md <<'EOF'
+# Release checklist
+- run `firebase deploy --only hosting`
+- gcloud run services update demo --region europe-west1
+- terraform apply, then kubectl delete pod demo
+EOF
+=== all=allow
+git commit -F - <<'EOF'
+docs: note that gcloud run deploy needs the owner
+EOF
+=== all=ask
+cat > docs/release.md <<'EOF'
+- terraform apply
+EOF
+terraform apply
+=== all=ask
+cat > docs/release.md <<'EOF'; firebase deploy
+notes
+EOF
+=== all=ask
+python3 - <<'EOF'
+import os; os.system('gcloud run deploy demo')
+EOF
+=== all=ask
+sh <<'EOF'
+kubectl delete pod demo
+EOF
+=== all=ask
+cat > docs/release.md <<EOF
+- run `firebase deploy`
+EOF
+=== all=ask
+echo note # c
+cat > docs/release.md <<'EOF'
+terraform apply
+EOF
+=== all=ask
+cat > run.sh <<'EOF'
+firebase deploy
+EOF
+sh run.sh

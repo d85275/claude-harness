@@ -5,6 +5,8 @@ argument-hint: <what you want built or fixed>
 
 Plan: **$ARGUMENTS**
 
+**Files and shell.** Create and edit ticket, tracker and plan files with the Edit and Write tools only, never through the shell (`cat > file <<EOF`, `python3 - <<EOF`, `printf >> file`). Run one plain command per Bash call, with absolute paths and `git -C <absolute path>` instead of `cd X && ...` chains. If a command still asks or is denied, stop and say which rule it hit; don't rewrite it to get around the check.
+
 1. Read the root `CLAUDE.md` (and its **Harness** section), relevant area `CLAUDE.md` files, and the code involved. If the project already has a spec or ticket covering this, use it and say which; do not invent a second source of truth.
 2. Recover what you can from the code and docs before asking anything. Ask only about choices with materially different outcomes.
 3. Draft the contract, one section per task:

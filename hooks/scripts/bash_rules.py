@@ -5,7 +5,8 @@ check() returns the decision for one command, or None to allow; guard.py prints 
 The shell text is read by shell_scan.py, and the push and config-write pass is ShellCheck in
 shell_check.py. The structural rule: the publish and redirect regexes read the full text, and
 scanner knowledge only removes a hit inside a proven data heredoc body (see ShellCheck.run).
-The credential and device-reset rules drop such a hit the same way, from the same spans (DataText).
+The credential, device-reset and always-ask rules drop such a hit the same way, from the same
+spans (DataText).
 """
 import fnmatch
 import os
@@ -68,11 +69,12 @@ SKIP_DIRS = ("node_modules",)  # plus every dot folder: never listed one level d
 CREDENTIAL_SECONDS = 4  # time for the credential pass; the hook timeout (10 s) would allow
 NOTICES = []  # warnings from the last check(); guard.py shows them as systemMessage
 class DataText:
-    """The command as the credential and device-reset rules read it (CH-10): a hit that lies
-    entirely inside the body of a proven data heredoc (CH-03's spans from shell_scan.scan_shell,
-    the same ones ShellCheck uses) is not a hit. When no body is proven data, the command cannot
-    be scanned (NUL byte, over the size cap, any error), or a DATA_TEXT_UNSAFE check holds,
-    nothing is exempt and the rules read the command exactly as before."""
+    """The command as the credential, device-reset and always-ask rules read it (CH-10, CH-33):
+    a hit that lies entirely inside the body of a proven data heredoc (CH-03's spans from
+    shell_scan.scan_shell, the same ones ShellCheck uses) is not a hit. When no body is proven
+    data, the command cannot be scanned (NUL byte, over the size cap, any error), or a
+    DATA_TEXT_UNSAFE check holds, nothing is exempt: search() reads the command as written and
+    with backslash-newlines joined, and a hit in either counts."""
 
     def __init__(self, cmd):
         self.cmd, self.full, self.spans, self.outside = cmd, cmd, [], cmd
@@ -289,9 +291,10 @@ def check(cmd, cfg, cwd, roots):
         ask = commit_ask(commit_dirs, cfg, cmd, roots)
         if ask:
             return ask
-    # Reached under "allow" too: a deploy or askCommand chained onto a push still asks.
+    # Reached under "allow" too: a deploy or askCommand chained onto a push still asks. Text
+    # inside a proven data heredoc body (a checklist that names a deploy) is not a hit (CH-33).
     for pattern in ALWAYS_ASK_COMMANDS + [re.escape(c) for c in cfg.get("askCommands", [])]:
-        if re.search(pattern, cmd):
+        if text.search(pattern):
             return ("ask", "Outward-facing or destructive command needs the owner's explicit OK: "
                     f"{cmd[:200]}")
     return None

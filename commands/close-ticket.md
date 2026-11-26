@@ -9,6 +9,8 @@ Conventions come from the project's Harness section (default: worktree `.worktre
 
 Run the state and board steps below only when `dev-harness-board status` exits 0 (the project has opted in with a `tickets` section in its `harness.json`); otherwise skip them silently and follow the project's own Harness section. (This covers every `dev-harness-board` call here; the cherry-pick, checks and cleanup always run.)
 
+**Files and shell.** Create and edit files with the Edit and Write tools only, never through the shell (`cat > file <<EOF`, `python3 - <<EOF`, `printf >> file`). Run one plain command per Bash call, with absolute paths, `git -C <absolute path>` and `--root <absolute path>` instead of `cd X && ...` chains; `<worktree>` below is the worktree's absolute path. Clean with the build tool's clean task, never `rm` with wildcards or variables. If a command still asks or is denied, stop and say which rule it hit; don't rewrite it to get around the check.
+
 ## 1. Preconditions - stop and report if any fails
 
 - Worktree and branch exist; `git -C <worktree> status --short` is empty, or its only changes are `set-state` edits (the Fixing from a review round): then run `dev-harness-board set-state <ID> "In review" --root <worktree>`, which restores the committed bytes of the tracker row and Status line, and check the status is empty; the branch has exactly one commit over its base.
@@ -35,7 +37,7 @@ Run the smallest check that proves the ticket on the integration branch (the pro
 
 ## 5. Clean up
 
-- `git worktree remove .worktrees/<id-lowercase>` (no `--force`; report anything left).
+- `git worktree remove <worktree>` (no `--force`; report anything left).
 - `git branch -D feature/<id-lowercase>` - `-D` is required because a cherry-picked branch is never "merged"; first confirm `git cherry -v <integration> feature/<id>` shows the commit as already applied (`-`) or that its patch landed.
 - Delete build caches and temporary devices this ticket created, per the Harness section's cleanup list. Machine-wide resets (e.g. `xcrun simctl --set testing delete all`) only when no other build/test is running (`pgrep -fl xcodebuild` is empty).
 - Keep cited result bundles.

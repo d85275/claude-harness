@@ -30,9 +30,13 @@ Blocks `cat`/`cp`/`grep`/... on keys, keystores, `.p8`, service-account JSON, `.
 
 ### Bash: deploys and destructive cloud commands
 
-- **Stops:** `firebase deploy` and destructive Firebase, gcloud, terraform and kubectl commands, plus your `askCommands`.
+- **Stops:** `firebase deploy` and destructive Firebase, gcloud, terraform and kubectl commands, plus your `askCommands`. Text about them in a plain-data heredoc body (a checklist being written) passes.
 - **Ask or block:** Always asks, whatever `pushPolicy` says.
-- **Known gaps:** Detection matches text; scripts that deploy are not seen unless you add them to `askCommands`.
+- **Known gaps:** Detection matches text; scripts that deploy are not seen unless you add them to `askCommands`. A file written by a data heredoc and then run without being named (through a glob, `make` reading a Makefile, `npm test` reading package.json, or a multi-line group piped to a shell) is not seen.
+
+#### Details
+
+Matches `firebase deploy` (and `firestore:delete`, `functions:delete`, `functions:config:set`, `hosting:disable`, `use`), a line with `gcloud` followed by `deploy`, `delete`, `set-iam-policy` or `update`, `terraform apply/destroy`, `kubectl apply/delete`, and each `askCommands` entry as literal text, with backslash-newline continuations joined (`firebase \` + `deploy`). Text that lies entirely inside the body of a plain-data heredoc (a ticket or release checklist written with `cat > docs/release.md <<'EOF'` that mentions `gcloud run services update`) is text being written and passes, under the same conditions as in the credential reads rule: nothing is exempt over 256 KB, or when the command has a carriage return, a `#` or `${` outside the bodies, an `alias`, a `cat`/`tee`/`git` function, a `PATH=` or `hash` change, `mkfifo` or an `exec` redirect, or a heredoc writing under `/dev/` or `/proc/`. The same command still asks when it runs for real: outside the body (before it, after the closing delimiter, or after `;` or `&&` on the heredoc line), in a body that runs as code (`python3 - <<'EOF'`, `sh <<'EOF'`, `cat <<'EOF' | bash`, an unquoted body with `$(...)` or backticks), inside `bash -c '...'`, or in a file written and then named again in the same command (`sh run.sh`).
 
 ### Bash: git stash and `core.hooksPath`
 
@@ -154,7 +158,7 @@ A preset switches on automatically when a project root (the `CLAUDE_PROJECT_DIR`
 | `"deny"` | Blocked outright (exit 2). The message tells the agent the owner pushes by hand. |
 | `"allow"` | No prompt from this hook, as long as git confirms that no `harness.json` in the repository (and none of the loaded ones) differs from the last commit. A modified, staged, deleted, untracked or ignored `harness.json`, one marked assume-unchanged or skip-worktree in the index, or a git error (for example outside a git repository), still asks: "push policy file changed in the working tree". Your own Claude Code permission rules still apply. Meant for your own interactive sessions. The hook cannot tell a subagent from the main session, so `"allow"` applies to subagents too; agents are kept from pushing by their instructions and your permission rules, not by this hook. |
 
-`pushPolicy` covers only git/GitHub publishing. Deploys and destructive cloud commands (`firebase deploy`, `gcloud ... deploy/delete`, `terraform apply/destroy`, `kubectl apply/delete`) and every `askCommands` entry always ask, whatever the policy, including when chained onto an allowed push. When config files merge, the strictest value wins (`deny` > `ask` > `allow`).
+`pushPolicy` covers only git/GitHub publishing. Deploys and destructive cloud commands (`firebase deploy`, `gcloud ... deploy/delete`, `terraform apply/destroy`, `kubectl apply/delete`) and every `askCommands` entry always ask, whatever the policy, including when chained onto an allowed push; text about them inside a plain data heredoc body does not (see [deploys and destructive cloud commands](#bash-deploys-and-destructive-cloud-commands)). When config files merge, the strictest value wins (`deny` > `ask` > `allow`).
 
 Turning on `"allow"` takes a change to `harness.json`. An Edit/Write of it asks, and so do the common shell writes to it (see the rules above). Whatever shell form was used, a push under `"allow"` still asks until the change is committed, and a commit is something you see. Permission deny rules (for example on `Bash(git push:*)`) are the hard boundary.
 

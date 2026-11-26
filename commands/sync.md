@@ -5,6 +5,8 @@ argument-hint: [optional scope, e.g. a phase or ticket range]
 
 Sync check **$ARGUMENTS**.
 
+**Files and shell.** Read files with the Read tool. Run one plain command per Bash call, with absolute paths and `git -C <absolute path>` instead of `cd X && ...` chains. If a command still asks or is denied, stop and say which rule it hit; don't rewrite it to get around the check.
+
 1. Read the project's plan/spec, its handoff/progress doc, and its evidence log (Harness section).
 2. Gather facts: `git log --oneline` on the integration branch (match commit messages to ticket IDs), `git worktree list`, `git branch --list 'feature/*'`, and unpushed state (`git status -sb`).
 3. Report, in a short table:
