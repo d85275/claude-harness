@@ -54,7 +54,7 @@ class BoardProject(TempProject):
         return {m.group(1): m.group(0) for m in re.finditer(r'<button type="button" class="card" data-id="([^"]+)".*?</button>', page, re.S)}
 
     def column_of(self, page, tid):
-        for m in re.finditer(r'<section class="col" aria-label="([^"]+)">(.*?)</section>', page, re.S):
+        for m in re.finditer(r'<section class="col[^"]*"[^>]*aria-label="([^"]+)">(.*?)</section>', page, re.S):
             if f'data-id="{tid}"' in m.group(2):
                 return m.group(1)
 
@@ -67,8 +67,38 @@ class ColumnTests(BoardProject):
                           "BUG-4": "Owner check", "BUG-5": "Planned", "BUG-6": "Blocked", "BUG-7": "In review"})
 
     def test_six_columns_in_order(self):
-        names = re.findall(r'<section class="col" aria-label="([^"]+)"', self.build())
+        names = re.findall(r'<section class="col[^"]*"[^>]*aria-label="([^"]+)"', self.build())
         self.assertEqual(names, ["Planned", "In progress", "In review", "Owner check", "Blocked", "Done"])
+
+
+class DoneCollapseTests(BoardProject):
+    def sections(self, page):
+        return {m.group(1): m.group(0) for m in re.finditer(
+            r'<section class="col[^"]*"[^>]*aria-label="([^"]+)">.*?</section>', page, re.S)}
+
+    def test_done_starts_collapsed_with_button(self):
+        sec = self.sections(self.build())["Done"]
+        self.assertIn('class="col done collapsed"', sec)
+        self.assertRegex(sec, r'<button type="button" class="fold" aria-expanded="false" data-fold>')
+        self.assertIn('class="count">1<', sec)
+
+    def test_other_columns_have_no_fold(self):
+        for name, sec in self.sections(self.build()).items():
+            if name != "Done":
+                self.assertNotIn("data-fold", sec)
+                self.assertNotIn("collapsed", sec)
+
+    def test_done_cards_still_in_page(self):
+        page = self.build()
+        self.assertEqual(self.column_of(page, "BUG-2"), "Done")
+        self.assertIn('data-id="BUG-2"', self.sections(page)["Done"])
+        self.assertIn('<section class="issue" data-id="BUG-2" hidden>', page)
+
+    def test_script_remembers_choice_safely(self):
+        page = self.build()
+        self.assertIn("board-done-open:", page)
+        self.assertRegex(page, r"try\{localStorage\.setItem\(foldKey")
+        self.assertRegex(page, r"try\{openDone=localStorage\.getItem\(foldKey")
 
 
 class CardTests(BoardProject):

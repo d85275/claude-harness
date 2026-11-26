@@ -35,7 +35,7 @@ def build_from_copy(tmp):
 
 
 def column_of(page, tid):
-    for m in re.finditer(r'<section class="col" aria-label="([^"]+)">(.*?)</section>', page, re.S):
+    for m in re.finditer(r'<section class="col[^"]*"[^>]*aria-label="([^"]+)">(.*?)</section>', page, re.S):
         if f'data-id="{tid}"' in m.group(2):
             return m.group(1)
 

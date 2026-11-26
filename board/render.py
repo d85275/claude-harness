@@ -169,10 +169,20 @@ def build_html(model, root, cfg, built_at, commit):
         probs = by_ticket.get(t["id"], [])
         columns[column_for(t)].append(_card(t, level, bool(probs), extra_cols))
         issues.append(_issue(t, root, level, probs, twins.get(t["id"], []), extra_cols))
-    cols_html = "".join(
-        f'<section class="col" aria-label="{esc(name)}"><h2><span>{esc(name)}</span><span class="count">'
-        f'{len(columns[name])}</span></h2>{"".join(columns[name])}<div class="empty"'
-        f'{" hidden" if columns[name] else ""}>Nothing here</div></section>' for name, _ in COLUMNS)
+    def col_html(name):
+        n = len(columns[name])
+        if name == "Done":
+            # Done starts collapsed: a real button toggles it (state kept in the browser by the script).
+            head = (f'<h2><button type="button" class="fold" aria-expanded="false" data-fold>'
+                    f'<span>{esc(name)}</span></button><span class="count">{n}</span></h2>'
+                    '<div class="hint" hidden></div>')
+            cls, attr = "col done collapsed", " data-done"
+        else:
+            head = f'<h2><span>{esc(name)}</span><span class="count">{n}</span></h2>'
+            cls, attr = "col", ""
+        return (f'<section class="{cls}"{attr} aria-label="{esc(name)}">{head}{"".join(columns[name])}'
+                f'<div class="empty"{" hidden" if columns[name] else ""}>Nothing here</div></section>')
+    cols_html = "".join(col_html(name) for name, _ in COLUMNS)
     kinds = {t["kind"] for t in tickets if t["kind"]}
     plats = {t["platform"] for t in tickets if t["platform"]}
     levels = [lv for lv in REVIEW_LEVELS if any(review_level(t["review"]) == lv for t in tickets)]
@@ -196,7 +206,7 @@ def build_html(model, root, cfg, built_at, commit):
 <select id="f-review" aria-label="Review level">{_options("All reviews", levels)}</select>
 <label><input type="checkbox" id="f-mismatch"> Mismatches only</label>
 </div>
-<main class="board">{cols_html}</main>
+<main class="board done-collapsed">{cols_html}</main>
 <div id="issues" role="dialog" aria-modal="true" hidden>{"".join(issues)}</div>
 <script>{assets.JS}</script>
 </body>
