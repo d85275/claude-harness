@@ -4,6 +4,17 @@ All notable changes to the `dev-harness` plugin. The format follows [Keep a Chan
 
 A version's date is set when the owner tags the release; until then it reads `Unreleased`. Earlier versions were not tagged; their dates are commit dates. Ticket IDs in parentheses point at [`docs/tickets/`](docs/tickets/).
 
+## [1.1.1] - 2026-11-26
+
+Fewer approval prompts during ticket work.
+
+### Changed
+
+- **A wildcard write asks only when it can reach a protected config.** `rm -f build/out/*.xml` and similar commands look at the files really in that folder and pass when none is a protected config (such as `lint.xml` or `.claude/harness.json`). This holds only when the whole command is a plain list of known readers, build and test runners with plain arguments, and git read commands; anything else (shell keywords, `sh -c`, `cp`/`mv` into the folder, unknown scripts, options outside a fixed list) asks as before. The prompt now names the command and the protected pattern it could match. See [docs/guards.md](docs/guards.md). (CH-31)
+- **Deploy words inside written text no longer ask.** Writing a ticket or checklist that mentions `firebase deploy` or `gcloud … update` through a data heredoc (`cat > file <<'EOF'`) passes; the same commands run for real, in code heredocs (`sh`, `python3 -`) or split with `\` across lines still ask. (CH-33)
+- **Agents edit files with the Edit and Write tools and run one plain command per call**, with absolute paths and the tool's own folder option instead of `cd` chains, so ticket work stops tripping approval prompts. Coordinators pass these rules into every brief. (CH-33)
+- **The board's Done column starts collapsed**, showing only its count; one click opens it, and the board remembers the choice. Search, filters and `#ID` links still reach Done tickets. (CH-32)
+
 ## [1.1.0] - 2026-11-24
 
 ### Added
