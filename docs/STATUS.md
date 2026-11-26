@@ -66,6 +66,7 @@ CH-01 is done (c2efe7d). CH-02 is done (ef867a1). CH-03 is done (b999c7d). CH-08
 - 2026-11-23: the board's git hooks live in an untracked folder inside the git common dir (`<common-dir>/dev-harness/hooks`), not a tracked `.githooks/`; each clone opts in with `install-hooks` (CH-17 review: a tracked folder vanished on older branches, skipping Git LFS's pre-push, and let any checked-out branch change hook code).
 - 2026-11-23: the guard asks before `install-hooks`/`uninstall-hooks` and edits to the hooks folder (CH-22, before 1.0).
 - 2026-11-23: new `pushPolicy: "feature-branches"`: agents (main session and subagents) may push feature branches without a prompt, never `main`/`master`; anything the guard can't prove asks (CH-09). Replaces the CH-07 subagent-push item.
+- 2026-11-26: reviewer agents stay read-only (no Write tool); they probe by rerunning tests or with a one-line `python3 -c` (CH-33).
 
 ## Updating the installed plugin (later, after Milestone A)
 
