@@ -37,5 +37,5 @@ States: `Planned`, `In progress`, `In review`, `Fixing`, `Owner check`, `Done`, 
 | [CH-29](CH-29.md) | Plugin ticket commands leave projects that have not switched over alone | standard | Done | 50a3eed | Owner request 2026-11-23, before tagging 1.0 |
 | [CH-30](CH-30.md) | Shorter README | self-review | Done | 4a187b3 | Owner request 2026-11-24, before tagging 1.0 |
 | [CH-31](CH-31.md) | A wildcard write asks only when it can reach a protected config | high-risk | Done        | bf71a6c | Owner request 2026-11-24, after a false prompt in a real project |
-| [CH-32](CH-32.md) | The board's Done column is collapsed by default | standard | In review   | | Owner decision 2026-11-25 |
+| [CH-32](CH-32.md) | The board's Done column is collapsed by default | standard | Done        | 33eaeb9 | Owner decision 2026-11-25 |
 | [CH-33](CH-33.md) | Fewer prompts during ticket work | high-risk | Done        | 658564b | Owner request 2026-11-25 |
