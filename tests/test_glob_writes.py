@@ -118,9 +118,12 @@ class GlobWriteTests(GuardTestCase):
         self.expect(["rm -f build/out/*.txt"], "allow")
         self.expect(["rm -f build/out/*.xml", "rm -f build/missing-*.xml"], "ask")
 
-    def test_case_variant_glob_asks(self):
+    def test_case_variant_glob_follows_the_filesystem(self):
+        """On macOS (case-insensitive) `*.XML` reaches lint.xml, so it asks; on a case-sensitive
+        filesystem the shell cannot match it, so it passes."""
         touch(os.path.join(self.out, "lint.xml"))
-        self.expect(["rm -f build/out/*.XML", "rm -f build/out/LINT.*"], "ask")
+        expected = "ask" if sys.platform == "darwin" else "allow"
+        self.expect(["rm -f build/out/*.XML", "rm -f build/out/LINT.*"], expected)
 
     # --- fail closed: the expansion is not certain ---------------------------------------------
 
